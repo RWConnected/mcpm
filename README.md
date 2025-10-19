@@ -28,6 +28,7 @@ It automates downloading, updating, and managing Minecraft mods — like `npm` o
   - Datapack management  
   - Shader and texture pack support  
   - Graphical interface via Tauri (Vue.js frontend)
+  - Test suite (eventually… I promise)
 
 ---
 
@@ -89,6 +90,10 @@ That said, please note:
 - To avoid wasted effort, it’s best to open an issue first to discuss major ideas before starting work.
 
 Even if a contribution isn’t merged, your input is still appreciated — it helps improve MCPM over time.
+
+### Contributor Requirements
+By submitting a contribution, you confirm that you have the right to do so and that any included third-party material is compatible with the Apache 2.0 license.
+Please mention external sources explicitly in pull requests if reused.
 
 ### Prerequisites
 - [Rust toolchain](https://rustup.rs/)
