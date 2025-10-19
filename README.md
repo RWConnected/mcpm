@@ -42,10 +42,10 @@ Head to the [**Releases page**](../../releases) and download the latest binary f
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/<your-username>/mcpm:latest
+docker pull ghcr.io/RWConnected/mcpm:latest
 
 # Run MCPM in a container (mount your modpack folder)
-docker run -it -v $(pwd):/data ghcr.io/<your-username>/mcpm:latest mcpm init
+docker run -it -v $(pwd):/data ghcr.io/RWConnected/mcpm:latest mcpm init
 ```
 
 Both binaries and Docker images include the CLI by default.
@@ -60,7 +60,7 @@ If you want to install MCPM on your system without using a prebuilt binary or Do
 #### Build and Run
 
 ```bash
-git clone https://github.com/<your-username>/mcpm.git
+git clone https://github.com/RWConnected/mcpm.git
 cd mcpm
 cargo install --path src-tauri
 ```
@@ -97,7 +97,7 @@ Even if a contribution isn’t merged, your input is still appreciated — it he
 ### Build and Run Locally
 
 ```bash
-git clone https://github.com/<your-username>/mcpm.git
+git clone https://github.com/RWConnected/mcpm.git
 cd mcpm/src-tauri
 cargo run --bin mcpm-cli -- <command> [options]
 ```
