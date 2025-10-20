@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(not(feature = "gui"))]
+use clap::CommandFactory;
+
 use clap::Parser;
 use mcpm_lib::app::{
     commands::Cli,
@@ -14,28 +17,50 @@ use mcpm_lib::app::{
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-
     Config::init(&cli);
+
+    // Determine mode based on features and CLI input
+    let mode = resolve_mode(&cli);
 
     let io_cfg = IOConfig {
         verbose: cli.verbose,
         quiet: cli.quiet,
-        mode: match cli.has_command() {
-            true => IOMode::Cli,
-            false => IOMode::Gui,
-        },
+        mode,
     };
     init_io(io_cfg).await;
 
-    if cli.has_command() {
-        unsafe {
-            set_interactive(true);
+    unsafe { set_interactive(true) }
+
+    if let Some(cmd) = cli.command {
+        cmd.run().await;
+    } else {
+        #[cfg(feature = "gui")]
+        {
+            mcpm_lib::run();
         }
-        if let Some(cmd) = cli.command {
-            cmd.run().await;
+
+        #[cfg(not(feature = "gui"))]
+        {
+            let mut cmd = Cli::command();
+            println!("mcpm {}", cmd.get_version().unwrap_or("unknown"));
+            cmd.print_help().unwrap();
+            println!();
         }
-        return;
+    }
+}
+
+fn resolve_mode(cli: &Cli) -> IOMode {
+    #[cfg(feature = "gui")]
+    {
+        if cli.has_command() {
+            IOMode::Cli
+        } else {
+            IOMode::Gui
+        }
     }
 
-    mcpm_lib::run()
+    #[cfg(not(feature = "gui"))]
+    {
+        IOMode::Cli
+    }
 }

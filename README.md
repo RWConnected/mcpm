@@ -1,8 +1,9 @@
 
 # MCPM — Minecraft Package Manager
 
-**MCPM** is a cross-platform **package manager for Minecraft** mods, written in **Rust** with a future **Tauri + Vue.js** GUI.  
+**MCPM** is a cross-platform **package manager for Minecraft** mods, written in **Rust**.
 It automates downloading, updating, and managing Minecraft mods — like `npm` or `cargo`, but for Minecraft.
+It is CLI-first but I'm planning a future release with an optional **Tauri + Vue.js** GUI.  
 
 > Hobby project in active development. Expect breaking changes.
 
@@ -104,12 +105,12 @@ Please mention external sources explicitly in pull requests if reused.
 ```bash
 git clone https://github.com/RWConnected/mcpm.git
 cd mcpm/src-tauri
-cargo run --bin mcpm-cli -- <command> [options]
+cargo run -- <command> [options]
 ```
 
 Example:
 ```bash
-cargo run --bin mcpm-cli -- add sodium --search
+cargo run -- add sodium --search
 ```
 
 ## Recommended IDE Setup
@@ -126,8 +127,6 @@ cargo run --bin mcpm-cli -- add sodium --search
 | `src-tauri/src/app/modules/core` | Core logic used by both CLI and GUI                                 |
 | `src-tauri/src/app/helpers`      | Shared helper functions that as haven't found its way into a module |
 | `src-tauri/src/app`              | Core logic (manifest, repositories, I/O, commands)                  |
-| `src-tauri/src/bin/cli.rs`       | Entrypoint for standalone CLI binary                                |
-| `src-tauri/src/main.rs`          | Tauri entrypoint (CLI + GUI)                                        |
 
 ---
 
