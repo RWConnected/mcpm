@@ -1,0 +1,61 @@
+name: Build and push single-arch Docker image
+description: >
+  Builds and pushes a single-architecture Docker image for MCPM to the GitHub Container Registry (GHCR)
+  using a prebuilt binary produced by the build-binary action.
+inputs:
+  arch:
+    description: CPU architecture for the Docker image (e.g., amd64, arm64).
+    required: true
+  target:
+    description: Rust target triple matching the prebuilt binary path.
+    required: true
+  binary_path:
+    description: >
+      Optional path to a prebuilt binary used for the image build.
+      If missing, the binary will be build by docker.
+    required: false
+  token:
+    description: GitHub token used for registry login.
+    required: true
+  image:
+    description: >
+      Full image name in GHCR (e.g., ghcr.io/owner/mcpm).
+      If set, the built image will also be tagged and pushed to this registry.
+    required: false
+
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    - name: Build and push image
+      shell: bash
+      run: |
+        TAG=${{ inputs.arch }}
+        BUILD_ARGS=""
+        if [[ -n "${{ inputs.binary_path }}" ]]; then
+          echo "Using prebuilt binary path: ${{ inputs.binary_path }}"
+          BUILD_ARGS="--build-arg BINARY_SOURCE=prebuilt --build-arg PREBUILT_PATH=${{ inputs.binary_path }}"
+        fi
+
+        if [[ -n "${{ inputs.image }}" ]]; then
+          echo "Pushing image to ${{ inputs.image }}:${TAG}"
+          PUSH_FLAG="-t ${{ inputs.image }}:${TAG} --push"
+        else
+          echo "Building image locally only"
+          PUSH_FLAG="--load"
+        fi
+
+        docker buildx build \
+          --platform linux/${{ inputs.arch }} \
+          ${BUILD_ARGS} \
+          ${PUSH_FLAG} .

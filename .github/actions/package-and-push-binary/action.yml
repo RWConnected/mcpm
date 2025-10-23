@@ -1,0 +1,47 @@
+name: Package and push binary
+description: >
+  Builds the MCPM Rust binary for a specific platform and architecture,
+  packages it into a compressed archive (.tar.gz or .zip), and uploads it
+  as a release asset when running on a tagged release.
+inputs:
+  arch:
+    description: CPU architecture of the build target (e.g., x86_64, arm64).
+    required: true
+  os:
+    description: Target operating system (linux, windows, or macos).
+    required: true
+  ref_name:
+    description: Current Git reference name, typically the release tag (e.g., v1.0.0).
+    required: true
+  variant:
+    description: The compiled variant, one of gui or cli.
+    required: true
+  source_directory:
+    description: The directory where the binary is located.
+    required: true
+
+runs:
+  using: composite
+  steps:
+
+    - name: Package binary
+      id: package
+      shell: bash
+      run: |
+        BIN="mcpm"
+        [[ "${{ inputs.os }}" == "windows" ]] && BIN="mcpm.exe"
+        SRC="${{ inputs.source_directory }}/$BIN"
+        EXT=$([[ "${{ inputs.os }}" == "windows" ]] && echo "zip" || echo "tar.gz")
+        OUT="mcpm-${{ inputs.variant }}-${{ inputs.ref_name }}-${{ inputs.os }}-${{ inputs.arch }}.${EXT}"
+        if [[ "${{ inputs.os }}" == "windows" ]]; then
+          7z a "$OUT" "$SRC" >NUL
+        else
+          tar -C "${{ inputs.source_directory }}" -czf "$OUT" "$BIN"
+        fi
+        echo "archive=$OUT" >> "$GITHUB_OUTPUT"
+
+    - name: Upload release asset
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ steps.package.outputs.archive  }}

@@ -1,31 +1,33 @@
 name: Build and Publish Docker Images
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: [published]
 
 jobs:
-  binaries:
+  setup:
+    runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.set.outputs.image }}
+    steps:
+      - id: set
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
+  build-binaries:
     if: startsWith(github.ref, 'refs/tags/v')
+    needs: setup
     strategy:
       matrix:
         include:
           # Linux
-          - runner: ubuntu-latest
-            os: linux
-            arch: x86_64
-            target: x86_64-unknown-linux-gnu
-          - runner: ubuntu-latest
+          - runner: ubuntu-24.04
             os: linux
             arch: x86_64
             target: x86_64-unknown-linux-musl
-          - runner: ubuntu-latest
+          - runner: ubuntu-24.04-arm
             os: linux
             arch: arm64
-            target: aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-musl
 
           # Windows (MSVC)
           - runner: windows-latest
@@ -34,11 +36,11 @@ jobs:
             target: x86_64-pc-windows-msvc
 
           # macOS
-          - runner: macos-14
+          - runner: macos-15
             os: macos
             arch: arm64
             target: aarch64-apple-darwin
-          - runner: macos-13
+          - runner: macos-15-intel
             os: macos
             arch: x86_64
             target: x86_64-apple-darwin
@@ -46,114 +48,73 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      # Linux cross toolchains as needed
-      - name: Install Linux linkers
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          case "${{ matrix.target }}" in
-            aarch64-unknown-linux-gnu)
-              sudo apt-get install -y gcc-aarch64-linux-gnu
-              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-              ;;
-            x86_64-unknown-linux-musl)
-              sudo apt-get install -y musl-tools
-              ;;
-          esac
-
-      # ---------- CLI ----------
-      - name: Build CLI
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Package CLI
-        shell: bash
-        run: |
-          BIN="mcpm"
-          [[ "${{ matrix.os }}" == "windows" ]] && BIN="mcpm.exe"
-          SRC="target/${{ matrix.target }}/release/$BIN"
-          OUT_CLI="mcpm-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.zip' || '.tar.gz' }}"
-          if [[ "${{ matrix.os }}" == "windows" ]]; then
-            7z a "$OUT_CLI" "$SRC" >NUL
-          else
-            tar -C "target/${{ matrix.target }}/release" -czf "$OUT_CLI" "$BIN"
-          fi
-          echo "CLI_ASSET=$OUT_CLI" >> $GITHUB_ENV
-
-      # ---------- GUI (not implemented yet) ----------
-      # - name: Build GUI
-      #   run: cargo build --release --features gui --target ${{ matrix.target }}
-
-      # - name: Package GUI
-      #   shell: bash
-      #   run: |
-      #     BIN="mcpm"
-      #     [[ "${{ matrix.os }}" == "windows" ]] && BIN="mcpm.exe"
-      #     SRC="target/${{ matrix.target }}/release/$BIN"
-      #     OUT_GUI="mcpm-gui-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.zip' || '.tar.gz' }}"
-      #     if [[ "${{ matrix.os }}" == "windows" ]]; then
-      #       7z a "$OUT_GUI" "$SRC" >NUL
-      #     else
-      #       tar -C "target/${{ matrix.target }}/release" -czf "$OUT_GUI" "$BIN"
-      #     fi
-      #     echo "GUI_ASSET=$OUT_GUI" >> $GITHUB_ENV
-
-      # Upload both assets to the GitHub Release
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            ${{ env.CLI_ASSET }}
-      #      ${{ env.GUI_ASSET }}
-
-  docker:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+      actions: read
       packages: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up QEMU (multi-arch emulation)
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Build and push Docker image (${{ matrix.arch }})
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/build-docker-image
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          arch: ${{ matrix.arch }}
+          target: ${{ matrix.target }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ needs.setup.outputs.image }}
 
-      - name: Extract metadata (tags, labels)
+      - name: Extract binary from Docker image (${{ matrix.arch }})
+        if: runner.os == 'Linux'
+        run: |
+          DIRECTORY=./target/${{ matrix.target }}/release
+          CID=$(docker create "${{ needs.setup.outputs.image }}:${{ matrix.arch }}")
+          mkdir -p $DIRECTORY
+          docker cp $CID:/usr/local/bin/mcpm $DIRECTORY/mcpm
+          docker rm $CID
+
+      - name: Build binary for ${{ matrix.os }}-${{ matrix.arch }}
+        if: runner.os != 'Linux'
+        uses: ./.github/actions/build-binary
+        with:
+          target: ${{ matrix.target }}
+          variant: cli
+      
+      - name: Package and upload ${{ matrix.os }}-${{ matrix.arch }} CLI binary
+        uses: ./.github/actions/package-and-push-binary
+        with:
+          arch: ${{ matrix.arch }}
+          os: ${{ matrix.os }}
+          ref_name: ${{ github.ref_name }}
+          variant: cli
+          source_directory: target/${{ matrix.target }}/release
+
+  docker-manifest:
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build-binaries
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract metadata (tags)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/mcpm
+          images: ${{ needs.setup.outputs.image }}
           tags: |
             type=sha,format=short,enable=${{ github.event_name != 'pull_request' }}
             type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern=v{{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern=v{{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=unstable,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Create multi-arch manifest
+        uses: ./.github/actions/docker-tag-manifest
         with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
+          image: ${{ needs.setup.outputs.image }}
+          ref_name: ${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          token: ${{ secrets.GITHUB_TOKEN }}

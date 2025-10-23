@@ -1,0 +1,31 @@
+name: Build and Package Binaries
+description: >
+  Builds the MCPM Rust binary for a specific platform and architecture,
+  packages it into a compressed archive (.tar.gz or .zip), and uploads it
+  as a release asset when running on a tagged release.
+inputs:
+  target:
+    description: Full Rust compilation target triple for cross-compilation.
+    required: true
+  variant:
+    description: The variant that needs to be compiled, one of gui or cli.
+    required: true
+
+runs:
+  using: composite
+  steps:
+
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.target }}
+
+    - name: Build CLI
+      if: ${{ inputs.variant == 'cli' }}
+      shell: bash
+      run: cargo build --release --target ${{ inputs.target }}
+
+    - name: Build GUI
+      if: ${{ inputs.variant == 'gui' }}
+      shell: bash
+      run: cargo build --release --features gui --target ${{ inputs.target }}
+

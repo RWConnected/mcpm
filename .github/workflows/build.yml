@@ -1,0 +1,38 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+
+jobs:
+  build-docker:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+            target: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            target: aarch64-unknown-linux-musl
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push Docker image (${{ matrix.arch }})
+        uses: ./.github/actions/build-docker-image
+        with:
+          arch: ${{ matrix.arch }}
+          target: ${{ matrix.target }}
+          ref_name: unstable
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image: ${REGISTRY_IMAGE,,}
