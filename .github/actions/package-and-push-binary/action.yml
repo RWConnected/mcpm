@@ -83,16 +83,22 @@ runs:
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_name }}
+        overwrite_files: true
         files: ${{ steps.package.outputs.archive }}.sig
 
     - name: Upload checksum
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_name }}
+        overwrite_files: true
         files: ${{ steps.checksum.outputs.checksum_file }}
 
     - name: Upload release asset
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_name }}
+        overwrite_files: true
         files: ${{ steps.package.outputs.archive  }}
