@@ -58,7 +58,6 @@ runs:
       shell: bash
       env:
         GPG_PRIVATE_KEY: ${{ inputs.gpg_private_key }}
-        GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
       run: |
         echo "$GPG_PRIVATE_KEY" | gpg --batch --import
         KEY_ID=$(gpg --list-keys --with-colons | grep '^pub' | cut -d: -f5 | head -n1)
@@ -67,6 +66,8 @@ runs:
     - name: Sign archive
       if: startsWith(github.ref, 'refs/tags/v')
       shell: bash
+      env:
+        GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
       run: |
         gpg --batch --yes --pinentry-mode loopback \
           --passphrase "$GPG_PASSPHRASE" \
