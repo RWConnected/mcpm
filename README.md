@@ -37,6 +37,8 @@ It is CLI-first but I'm planning a future release with an optional **Tauri + Vue
 
 You can use MCPM without building it yourself.
 
+> The distributed executables are not code-signed and will show an “Unknown Publisher / Unidentified Developer” warning from the OS. This is expected, see [Bypassing OS warnings](#bypassing-os-warnings). You can verify any download before running. See [Verify Downloads](#verify-downloads) for verification steps.
+
 ### Option 1 — Download a Prebuilt Binary
 Head to the [**Releases page**](../../releases) and download the latest binary for your platform.
 
@@ -129,6 +131,75 @@ cargo run -- add sodium --search
 | `src-tauri/src/app`              | Core logic (manifest, repositories, I/O, commands)                  |
 
 ---
+
+## Bypassing OS warnings
+
+Before running the binary and following these instructions, make sure you trust the binaries first!
+See [Verify Downloads](#verify-downloads) for verification steps.
+
+### Windows (SmartScreen)
+
+1. Run the executable as you normally would.
+2. When “Windows protected your PC” appears:
+  - Click More info
+  - Click Run anyway
+
+Alternatively, you could trust the binary through PowerShell:
+```powershell
+Unblock-File -Path .\mcpm.exe
+```
+
+### macOS (Gatekeeper)
+
+1. Run the executable as you normally would.
+2. If blocked as “unidentified developer”:
+  - Control-click the app → Open → Open again
+  - Or allow it under System Settings → Privacy & Security → Allow Anyway
+
+Alternatively, you could trust the binary through CLI:
+```zsh
+xattr -cr /path/to/mcpm.app
+sudo spctl --add /path/to/mcpm.app
+```
+
+## Verify Downloads
+
+To ensure the binary is authentic and unmodified:
+
+1. Download files
+
+From the GitHub Releases page, download:
+- The binary (mcpm-.zip or mcpm-.tar.gz)
+- Its signature (.sig)
+- The checksum file (.sha256)
+- The public key (publickey.asc)
+
+2. Verify checksum
+
+Confirm the file was not corrupted.
+
+**Windows:**
+```shell
+certutil -hashfile mcpm-*.zip SHA256
+```
+
+**macOS/Linux:**
+```shell
+shasum -a 256 mcpm-*.tar.gz
+```
+
+Compare the result to the contents of the .sha256 file.
+
+3. Verify signature
+
+Validate that Rickiewars signed the release.
+
+```shell
+gpg --import publickey.asc
+gpg --verify mcpm-*.sig mcpm-*.tar.gz
+```
+
+If output includes “Good signature from "Rickiewars"”, verification succeeded
 
 ## License
 
