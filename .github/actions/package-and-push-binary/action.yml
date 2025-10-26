@@ -19,6 +19,12 @@ inputs:
   source_directory:
     description: The directory where the binary is located.
     required: true
+  gpg_private_key:
+    description: The private key for signing the release asset.
+    required: true
+  gpg_passphrase:
+    description: The passphrase for the private key.
+    required: true
 
 runs:
   using: composite
@@ -51,8 +57,8 @@ runs:
       if: startsWith(github.ref, 'refs/tags/v')
       shell: bash
       env:
-        GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        GPG_PRIVATE_KEY: ${{ inputs.gpg_private_key }}
+        GPG_PASSPHRASE: ${{ inputs.gpg_passphrase }}
       run: |
         echo "$GPG_PRIVATE_KEY" | gpg --batch --import
         KEY_ID=$(gpg --list-keys --with-colons | grep '^pub' | cut -d: -f5 | head -n1)
