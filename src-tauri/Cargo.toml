@@ -18,6 +18,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "mcpm"
 path = "src/main.rs"
 
+[[bin]]
+name = "mcpm_gui"
+path = "src/main.rs"
+required-features = ["gui"]
+
 [build-dependencies]
 tauri-build = { version = "2", optional = true }
 

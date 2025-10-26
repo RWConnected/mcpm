@@ -2,17 +2,10 @@ use std::error::Error;
 
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IOMode {
-    Cli,
-    Gui,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct IOConfig {
     pub verbose: bool,
     pub quiet: bool,
-    pub mode: IOMode,
 }
 
 #[derive(Debug, Clone)]
