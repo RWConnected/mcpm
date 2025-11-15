@@ -57,10 +57,14 @@ impl Install {
             }
         }
 
+        let mut expected_mod_files = Vec::<PathBuf>::new();
+
         // 2. Download mods
         for (key, entry) in &manager.lock_service.lock.mods {
-            let target_path = mods_dir.join(format!("{}-{}.jar", key, entry.version));
-            let cache_path = cache_dir.join(format!("{}-{}.jar", key, entry.version));
+            let file_name = format!("{}-{}.jar", key, entry.version);
+            let target_path = mods_dir.join(&file_name);
+            let cache_path = cache_dir.join(&file_name);
+            expected_mod_files.push(target_path.clone());
 
             let dest = if no_cache { &target_path } else { &cache_path };
             if !dest.exists() || force_rehash {
@@ -71,6 +75,19 @@ impl Install {
             if !no_cache {
                 fs::copy(&cache_path, &target_path)
                     .map_err(|e| format!("Copy failed for {}: {}", key, e))?;
+            }
+        }
+
+        // 3. Remove outdated mod files
+        for entry in
+            fs::read_dir(&mods_dir).map_err(|e| format!("Failed to read mods directory: {}", e))?
+        {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.is_file() {
+                if !expected_mod_files.contains(&path) {
+                    fs::remove_file(&path)
+                        .map_err(|e| format!("Failed to remove outdated mod {:?}: {}", path, e))?;
+                }
             }
         }
 
