@@ -1,30 +1,27 @@
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
     use std::{fs, path::PathBuf};
     use tempfile::tempdir;
 
     use sha2::{Digest, Sha512};
     use tokio;
 
-    use crate::app::{
-        commands::Cli,
-        modules::{core::install::Install, io::init_io},
-        Config,
-    };
-
+    use crate::app::helpers::test_utils::init_config;
+    use crate::app::modules::core::install::Install;
     // Verify that a basic install works
     // Re-running install without manifest changes should not rewrite or redownload anything
     //
 
     #[tokio::test]
+    #[serial]
     async fn install_removes_old_versions_when_package_updates() {
         // Arrange: temp workspace
         let temp = tempdir().unwrap();
         let root = temp.path().to_path_buf();
-        std::env::set_current_dir(&root).unwrap(); // Install reads mcpm.json/mcpm.lock from CWD
 
         // Set config and IO once for the test
-        set_config(&root).await;
+        init_config(&root).await;
 
         // First state: version 1.0.0
         make_manifest(&root, "1.0.0");
@@ -62,24 +59,6 @@ mod tests {
             "Old version still present; expected cleanup to remove {}",
             v1_path.display()
         );
-    }
-
-    async fn set_config(root: &PathBuf) {
-        // Point all paths into the temp workspace
-        let cli = Cli {
-            verbose: false,
-            quiet: true,
-            cache_dir: Some(root.join("cache").to_string_lossy().to_string()),
-            output_dir: Some(root.to_string_lossy().to_string()),
-            mods_dir: Some(root.join("mods").to_string_lossy().to_string()),
-            command: None,
-        };
-        Config::init(&cli);
-        init_io(crate::app::modules::io::traits::IOConfig {
-            verbose: false,
-            quiet: true,
-        })
-        .await;
     }
 
     fn make_manifest(root: &PathBuf, version: &str) {

@@ -81,7 +81,7 @@ impl Add {
         manager.manifest.insert_mod_entry(&entry);
 
         manager
-            .refresh_mod(&entry, Some(&versions), false)
+            .refresh_mod(&entry, Some(&versions), false, false)
             .await
             .map_err(|e| format!("Failed to update lockfile: {}", e))?;
 

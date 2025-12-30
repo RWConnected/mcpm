@@ -33,6 +33,7 @@ impl ModManager {
         entry: &ModEntry,
         available: Option<&[VersionResult]>,
         upgrade: bool,
+        ignore_constraints: bool,
     ) -> Result<()> {
         let success = self
             .lock_service
@@ -42,6 +43,7 @@ impl ModManager {
                 &self.repo_service,
                 available,
                 upgrade,
+                ignore_constraints
             )
             .await;
         if !success {

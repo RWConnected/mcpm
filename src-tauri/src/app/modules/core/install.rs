@@ -1,7 +1,7 @@
 use reqwest::Client;
 use sha2::{Digest, Sha512};
 use std::{
-    env, fs,
+    fs,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -26,7 +26,7 @@ impl Install {
 
         for entry in &mods {
             manager
-                .refresh_mod(entry, None, false)
+                .refresh_mod(entry, None, false, false)
                 .await
                 .map_err(|e| format!("Failed to resolve {}: {}", entry.slug, e))?;
         }

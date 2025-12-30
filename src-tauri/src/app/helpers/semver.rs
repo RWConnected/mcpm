@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::app::modules::{manifest::models::VersionSpec, repositories::models::VersionResult};
 use semver::{Version, VersionReq};
 
@@ -25,6 +27,17 @@ pub fn satisfies(spec: &VersionSpec, version: &str) -> bool {
             }],
         )
         .is_some(),
+    }
+}
+
+pub fn compare_versions(a: &str, b: &str) -> Ordering {
+    let na = normalize_version(a);
+    let nb = normalize_version(b);
+    match (Version::parse(&na), Version::parse(&nb)) {
+        (Result::Ok(va), Result::Ok(vb)) => va.cmp(&vb),
+        (Result::Ok(_va), Result::Err(_e)) => Ordering::Greater,
+        (Result::Err(_e), Result::Ok(_vb)) => Ordering::Less,
+        (Result::Err(_ea), Result::Err(_eb)) => a.cmp(b),
     }
 }
 

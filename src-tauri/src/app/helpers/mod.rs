@@ -1,5 +1,7 @@
 pub mod cli;
 pub mod semver;
+pub mod test_utils;
+
 use serde::Serialize;
 
 pub fn as_str<T: Serialize>(value: &T) -> String {

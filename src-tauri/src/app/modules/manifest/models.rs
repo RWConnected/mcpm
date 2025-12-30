@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use clap::ValueEnum;
+use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize};
 use strum_macros::{Display, EnumString};
 
@@ -103,7 +102,7 @@ pub struct Manifest {
     pub modloader: ModLoader,
     pub minecraft_version: String,
     pub default_provider: Provider,
-    pub mods: HashMap<String, VersionSpec>,
+    pub mods: IndexMap<String, VersionSpec>,
     pub license: Option<String>,
     pub homepage: Option<String>,
     pub tags: Option<Vec<String>>,
@@ -120,7 +119,7 @@ pub struct PartialManifest {
     pub modloader: Option<ModLoader>,
     pub minecraft_version: Option<String>,
     pub default_provider: Option<Provider>,
-    pub mods: Option<HashMap<String, VersionSpec>>,
+    pub mods: Option<IndexMap<String, VersionSpec>>,
     pub license: Option<String>,
     pub homepage: Option<String>,
     pub tags: Option<Vec<String>>,
@@ -137,7 +136,7 @@ impl Default for Manifest {
             modloader: ModLoader::Fabric,
             minecraft_version: "1.21.7".to_string(),
             default_provider: Provider::Modrinth,
-            mods: HashMap::new(),
+            mods: IndexMap::new(),
             license: None,
             homepage: None,
             tags: None,
@@ -208,56 +207,12 @@ impl Manifest {
         let io = use_io();
 
         let key = format!("{}:{}", provider, slug);
-        if self.mods.remove(&key).is_some() {
+        if self.mods.shift_remove(&key).is_some() {
             io.success(&format!("Removed {}", key));
             true
         } else {
             io.warn(&format!("No entry found for {}", key));
             false
-        }
-    }
-}
-
-impl PartialManifest {
-    /// Extract a PartialManifest safely from any JSON value
-    pub fn from_value(value: serde_json::Value) -> Self {
-        Self {
-            name: value
-                .get("name")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            version: value
-                .get("version")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            description: value
-                .get("description")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            author: value
-                .get("author")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            side: value
-                .get("side")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            modloader: value
-                .get("modloader")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            minecraft_version: value
-                .get("minecraft_version")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            default_provider: value
-                .get("default_provider")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            mods: value
-                .get("mods")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            license: value
-                .get("license")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            homepage: value
-                .get("homepage")
-                .and_then(|v| v.as_str().map(|s| s.to_string())),
-            tags: value
-                .get("tags")
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
         }
     }
 }

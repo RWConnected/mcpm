@@ -1,3 +1,4 @@
+pub mod fake;
 pub mod models;
 pub mod modrinth;
 // later: pub mod curseforge;

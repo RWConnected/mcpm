@@ -25,6 +25,15 @@ It is CLI-first but I'm planning a future release with an optional **Tauri + Vue
 - **Cross-platform** (Windows, macOS, Linux)
 - **Planned:**  
   - More sources like Curseforge, Github, Gitlab
+  - Restructure mod entry into an object:
+    - Slug (as object key) - Human friendly identifier or an ID if slug not available
+    - Version - supports semantic versioning and range matching
+    - Providers - List of sources to search for updates for this mod
+    - Name - User friendly name
+    - Author - Author's name or username
+    - Description - Short description from mod page. Can be overrided by the user and can be used for notes about the mod.
+    - Accepted Minecraft versions - Override the accepted Minecraft version when searching for a mod version
+    - Disabled - Disable mod from being installed (useful when a mod yet has to be updated to the newest Minecraft version)
   - Resource pack management  
   - Datapack management  
   - Shader and texture pack support  
@@ -40,7 +49,7 @@ You can use MCPM without building it yourself.
 > The distributed executables are not code-signed and will show an “Unknown Publisher / Unidentified Developer” warning from the OS. This is expected, see [Bypassing OS warnings](#bypassing-os-warnings). You can verify any download before running. See [Verify Downloads](#verify-downloads) for verification steps.
 
 ### Option 1 — Download a Prebuilt Binary
-Head to the [**Releases page**](../../releases) and download the latest binary for your platform.
+Head to the [**Releases page**](https://github.com/RWConnected/mcpm/releases) and download the latest binary for your platform.
 
 ### Option 2 — Use Docker
 

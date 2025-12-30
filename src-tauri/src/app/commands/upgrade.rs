@@ -14,13 +14,16 @@ pub struct UpgradeCommand {
 
     #[arg(long)]
     pub force_rehash: bool,
+
+    #[arg(long)]
+    pub ignore_constraints: bool,
 }
 
 impl UpgradeCommand {
     pub async fn handle(&self) {
         let io = use_io();
 
-        match Upgrade::run(&self.mods).await {
+        match Upgrade::run(&self.mods, self.ignore_constraints).await {
             Ok(result) => {
                 if result.upgraded.is_empty() {
                     io.info("All selected mods are already up to date");

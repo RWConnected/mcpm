@@ -1,11 +1,11 @@
+use crate::app::commands::Cli;
 use dirs;
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
 use std::{
     env,
     path::{Path, PathBuf},
 };
-
-use crate::app::commands::Cli;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -16,7 +16,8 @@ pub struct Config {
     pub mods_dir: PathBuf,
 }
 
-static CONFIG: OnceCell<Config> = OnceCell::new();
+static CONFIG: Lazy<Mutex<Option<Config>>> =
+    Lazy::new(|| Mutex::new(None));
 
 impl Config {
     pub fn init(cli: &Cli) {
@@ -26,19 +27,46 @@ impl Config {
         let verbose = cli.verbose.clone();
         let quiet = cli.quiet.clone();
 
-        CONFIG
-            .set(Self {
-                verbose,
-                quiet,
-                cache_dir,
-                output_dir,
-                mods_dir,
-            })
-            .ok();
+        let mut guard = CONFIG.lock().unwrap();
+
+        *guard = Some(Self {
+            verbose,
+            quiet,
+            cache_dir,
+            output_dir,
+            mods_dir,
+        });
     }
 
     pub fn get() -> &'static Self {
-        CONFIG.get().expect("GlobalConfig not initialized")
+        // SAFETY:
+        // The reference is valid for the duration of the program,
+        // because the Config is stored in a static and never moved.
+        unsafe {
+            let guard = CONFIG.lock().unwrap();
+            let cfg = guard.as_ref().expect("Config not initialized");
+            &*(cfg as *const Config)
+        }
+    }
+
+    #[cfg(test)]
+    pub fn reset_for_tests() {
+        *CONFIG.lock().unwrap() = None;
+    }
+    pub fn output_dir() -> PathBuf {
+        Self::get().output_dir.clone()
+    }
+
+    pub fn manifest_path() -> PathBuf {
+        Self::output_dir().join("mcpm.json").clone()
+    }
+
+    pub fn lock_path() -> PathBuf {
+        Self::output_dir().join("mcpm.lock")
+    }
+
+    pub fn gitignore_path() -> PathBuf {
+        Self::output_dir().join(".gitignore")
     }
 
     fn resolve_cache_dir(cli_cache: Option<String>) -> PathBuf {

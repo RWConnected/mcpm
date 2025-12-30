@@ -10,3 +10,4 @@ pub mod upgrade;
 
 #[cfg(test)]
 mod install_spec;
+mod upgrade_spec;

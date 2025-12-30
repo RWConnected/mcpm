@@ -1,18 +1,13 @@
 use super::models::{LockEntry, LockFile};
-use crate::app::{
-    helpers::{
-        as_str,
-        semver::{resolve_version, satisfies},
-    },
-    modules::{
-        io::use_io,
-        manifest::models::{Manifest, ModEntry, VersionSpec},
-        repositories::{models::VersionResult, RepositoryService},
-    },
-};
-use std::collections::HashMap;
-
-const LOCK_FILE: &str = "mcpm.lock";
+use crate::app::{helpers::{
+    as_str,
+    semver::{compare_versions, resolve_version, satisfies},
+}, modules::{
+    io::use_io,
+    manifest::models::{Manifest, ModEntry, VersionSpec},
+    repositories::{models::VersionResult, RepositoryService},
+}, Config};
+use std::collections::{BTreeMap, HashMap};
 
 pub struct LockService {
     pub lock: LockFile,
@@ -20,11 +15,12 @@ pub struct LockService {
 
 impl LockService {
     pub fn exists() -> bool {
-        std::path::Path::new(LOCK_FILE).exists()
+        Config::lock_path().exists()
     }
 
     pub fn load() -> Self {
-        let lock = std::fs::read_to_string(LOCK_FILE)
+        let path = Config::lock_path();
+        let lock = std::fs::read_to_string(path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or(LockFile {
@@ -35,8 +31,19 @@ impl LockService {
     }
 
     pub fn save(&self) -> std::io::Result<()> {
-        let content = serde_json::to_string_pretty(&self.lock).unwrap();
-        std::fs::write(LOCK_FILE, content)
+        let mut sorted_mods = BTreeMap::new();
+
+        for (id, entry) in &self.lock.mods {
+            sorted_mods.insert(id.clone(), entry.clone());
+        }
+
+        let lock = serde_json::json!({
+            "mods": sorted_mods
+        });
+
+        let path = Config::lock_path();
+        std::fs::write(path, serde_json::to_string_pretty(&lock)?)?;
+        Ok(())
     }
 
     pub async fn update_entry(
@@ -46,6 +53,7 @@ impl LockService {
         repo_service: &RepositoryService,
         available: Option<&[VersionResult]>,
         upgrade: bool,
+        ignore_constraints: bool,
     ) -> bool {
         let io = use_io();
 
@@ -88,9 +96,13 @@ impl LockService {
             return false;
         }
 
-        let resolved = match &manifest_mod.version {
-            VersionSpec::Exact(v) => versions.iter().find(|vr| &vr.version == v).cloned(),
-            VersionSpec::Range(r) => resolve_version(r.as_str(), &versions),
+        let resolved = match (ignore_constraints, &manifest_mod.version) {
+            (true, _) => versions
+                .iter()
+                .max_by(|a, b| compare_versions(&a.version, &b.version))
+                .cloned(),
+            (false, VersionSpec::Exact(v)) => versions.iter().find(|vr| &vr.version == v).cloned(),
+            (false, VersionSpec::Range(r)) => resolve_version(r.as_str(), &versions),
         };
 
         match resolved {
@@ -130,7 +142,7 @@ impl LockService {
         let mut success = true;
         for m in &manifest.mods_as_entries() {
             if !self
-                .update_entry(m, manifest, repo_service, None, upgrade)
+                .update_entry(m, manifest, repo_service, None, upgrade, false)
                 .await
             {
                 success = false;
