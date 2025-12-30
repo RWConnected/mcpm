@@ -12,14 +12,11 @@ pub async fn init_config(root: &PathBuf) {
     let cache_dir = root.join("cache");
     let mods_dir = root.join("mods");
 
-    fs::create_dir_all(&root).unwrap();
-    fs::create_dir_all(&cache_dir).unwrap();
-    fs::create_dir_all(&mods_dir).unwrap();
-
     let cli = Cli {
         verbose: false,
         quiet: true,
         cache_dir: Some(cache_dir.to_string_lossy().to_string()),
+        project_dir: Some(root.to_string_lossy().to_string()),
         output_dir: Some(root.to_string_lossy().to_string()),
         mods_dir: Some(mods_dir.to_string_lossy().to_string()),
         command: None,

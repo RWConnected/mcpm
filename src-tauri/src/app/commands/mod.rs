@@ -29,11 +29,15 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub quiet: bool,
 
+    /// Project directory. (env: MCPM_PROJECT_DIR, default: ./)
+    #[arg(long, global = true)]
+    pub project_dir: Option<String>,
+
     /// Cache directory. (env: MCPM_CACHE_DIR, default: ~/.mcpm/cache)
     #[arg(long, global = true)]
     pub cache_dir: Option<String>,
 
-    /// Output directory. (env: MCPM_OUTPUT_DIR, default: ./)
+    /// Output directory (absolute or relative to --project-dir) (env: MCPM_OUTPUT_DIR, default: ./)
     #[arg(long, global = true)]
     pub output_dir: Option<String>,
 
