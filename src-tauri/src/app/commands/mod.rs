@@ -75,7 +75,7 @@ impl Commands {
             Commands::Install(cmd) => cmd.handle().await,
             Commands::Upgrade(cmd) => cmd.handle().await,
             Commands::Outdated(cmd) => cmd.handle().await,
-            Commands::List(cmd) => cmd.handle(),
+            Commands::List(cmd) => cmd.handle().await,
             Commands::Search(cmd) => cmd.handle().await,
             Commands::Add(cmd) => cmd.handle().await,
             Commands::Remove(cmd) => cmd.handle().await,

@@ -20,6 +20,7 @@ pub enum PromptResult<T> {
 #[async_trait]
 pub trait Output {
     fn debug(&self, msg: &str);
+    fn print(&self, msg: &str);
     fn info(&self, msg: &str);
     fn success(&self, msg: &str);
     fn warn(&self, msg: &str);

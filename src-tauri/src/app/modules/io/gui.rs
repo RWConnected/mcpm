@@ -18,22 +18,25 @@ impl GuiIO {
 impl Output for GuiIO {
     fn debug(&self, msg: &str) {
         if self.cfg.verbose {
-            println!("[DEBUG] {msg}");
+            println!("{:<8}{msg}", "[DEBUG]");
         }
     }
+    fn print(&self, msg: &str) {
+        println!("{:<8}{msg}", "");
+    }
     fn info(&self, msg: &str) {
-        println!("[INFO] {msg}");
+        println!("{:<8}{msg}", "[INFO]");
     }
     fn success(&self, msg: &str) {
-        println!("[OK] {msg}");
+        println!("{:<8}{msg}", "[OK]");
     }
     fn warn(&self, msg: &str) {
-        eprintln!("[WARN] {msg}");
+        eprintln!("{:<8}{msg}", "[WARN]");
     }
     fn error(&self, msg: &str, err: Option<&dyn Error>) {
         match err {
-            Some(e) => eprintln!("[ERR] {msg}: {e}"),
-            None => eprintln!("[ERR] {msg}"),
+            Some(e) => eprintln!("{:<8}{msg}: {e}", "[ERR]"),
+            None => eprintln!("{:<8}{msg}", "[ERR]"),
         }
     }
 }

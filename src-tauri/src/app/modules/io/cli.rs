@@ -27,27 +27,32 @@ impl CliIO {
 impl Output for CliIO {
     fn debug(&self, msg: &str) {
         if self.cfg.verbose {
-            println!("{} {}", "[DEBUG]".purple().bold(), msg);
+            println!("{:<8}{msg}", "[DEBUG]".purple().bold());
+        }
+    }
+    fn print(&self, msg: &str) {
+        if !self.cfg.quiet {
+            println!("{:<8}{msg}", "");
         }
     }
     fn info(&self, msg: &str) {
         if !self.cfg.quiet {
-            println!("{} {}", "[INFO]".blue().bold(), msg);
+            println!("{:<8}{msg}", "[INFO]".blue().bold());
         }
     }
     fn success(&self, msg: &str) {
         if !self.cfg.quiet {
-            println!("{} {}", "[OK]".green().bold(), msg);
+            println!("{:<8}{msg}", "[OK]".green().bold());
         }
     }
     fn warn(&self, msg: &str) {
-        eprintln!("{} {}", "[WARNING]".yellow().bold(), msg);
+        eprintln!("{:<8}{msg}", "[WARNING]".yellow().bold());
     }
     fn error(&self, msg: &str, err: Option<&dyn Error>) {
         let prefix = "[ERROR]".red().bold();
         match err {
-            Some(e) => eprintln!("{} {}: {}", prefix, msg, e),
-            None => eprintln!("{} {}", prefix, msg),
+            Some(e) => eprintln!("{:<8}{msg}: {e}", prefix),
+            None => eprintln!("{:<8}{msg}", prefix),
         }
     }
 }

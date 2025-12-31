@@ -6,7 +6,7 @@ use crate::app::modules::core::list::List;
 pub struct ListCommand {}
 
 impl ListCommand {
-    pub fn handle(&self) {
-        List::run();
+    pub async fn handle(&self) {
+        List::run().await.expect("Failed to list mods");
     }
 }
