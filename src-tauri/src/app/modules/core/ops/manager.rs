@@ -39,7 +39,7 @@ impl ModManager {
             .lock_service
             .update_entry(
                 entry,
-                &self.manifest,
+                &mut self.manifest,
                 &self.repo_service,
                 available,
                 upgrade,

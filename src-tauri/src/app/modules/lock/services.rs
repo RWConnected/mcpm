@@ -49,7 +49,7 @@ impl LockService {
     pub async fn update_entry(
         &mut self,
         manifest_mod: &ModEntry,
-        manifest: &Manifest,
+        manifest: &mut Manifest,
         repo_service: &RepositoryService,
         available: Option<&[VersionResult]>,
         upgrade: bool,
@@ -108,15 +108,23 @@ impl LockService {
         match resolved {
             Some(resolved) => {
                 self.lock.mods.insert(
-                    key,
+                    key.clone(),
                     LockEntry {
                         id: resolved.mod_id,
-                        version: resolved.version,
+                        version: resolved.version.clone(),
                         url: resolved.url,
                         minecraft_versions: resolved.minecraft_versions,
                         hash: resolved.hash,
                     },
                 );
+                if (upgrade) {
+                    manifest.mods.get_mut(&key).map(|v| {
+                        *v = match (v) {
+                            VersionSpec::Exact(_) => VersionSpec::Exact(resolved.version),
+                            VersionSpec::Range(_) => VersionSpec::Range("^".to_string() + &resolved.version),
+                        }
+                    });
+                }
             }
             None => {
                 io.error(
@@ -135,7 +143,7 @@ impl LockService {
     // Use this in install and upgrade commands
     pub async fn refresh(
         &mut self,
-        manifest: &Manifest,
+        manifest: &mut Manifest,
         repo_service: &RepositoryService,
         upgrade: bool,
     ) -> bool {

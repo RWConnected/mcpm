@@ -44,11 +44,11 @@ impl ManifestService {
     }
 
     /// Save the manifest to disk
-    pub fn save(&self, manifest: &Manifest) -> std::io::Result<()> {
+    pub fn save(&self, manifest: &Manifest) -> io::Result<()> {
         let path = Config::manifest_path();
 
-        let json = serde_json::to_string_pretty(manifest).unwrap();
-        std::fs::write(path, json)?;
+        let json = serde_json::to_string_pretty(manifest)?;
+        fs::write(path, json)?;
         Ok(())
     }
 
