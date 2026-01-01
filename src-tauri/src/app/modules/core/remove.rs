@@ -4,12 +4,12 @@ pub struct Remove;
 
 impl Remove {
     pub async fn run(slug: String, provider: Option<Provider>) -> Result<Option<String>, String> {
-        let mut manager = ModManager::load()
-            .await
-            .map_err(|e| format!("Failed to initialize ModManager: {}", e))?;
+        let mut manager = ModManager::new();
+        manager.load().await;
+        manager.with_default_providers(); // TODO: Check if required
 
-        let provider = provider.unwrap_or(manager.manifest.default_provider.clone());
-        if !manager.manifest.remove_mod_entry(&provider, &slug) {
+        let provider = provider.unwrap_or(manager.manifest_service.manifest.default_provider.clone());
+        if !manager.manifest_service.manifest.remove_mod_entry(&provider, &slug) {
             return Ok(Some(format!("Mod '{}' not found in manifest", slug)));
         }
 

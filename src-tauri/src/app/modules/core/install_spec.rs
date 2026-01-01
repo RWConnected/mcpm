@@ -1,113 +1,117 @@
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-    use std::{fs, path::PathBuf};
-    use tempfile::tempdir;
-
-    use sha2::{Digest, Sha512};
-    use tokio;
-
-    use crate::app::helpers::test_utils::init_config;
+    use crate::app::helpers::factories::FakeRepository;
+    use crate::app::helpers::factories::LockfileFactory;
+    use crate::app::helpers::factories::ManifestFactory;
+    use crate::app::helpers::factories::ModFactory;
+    use crate::app::modules::core::download::FakeDownloadService;
     use crate::app::modules::core::install::Install;
-    // Verify that a basic install works
-    // Re-running install without manifest changes should not rewrite or redownload anything
-    //
+    use crate::app::modules::core::ops::manager::ModManager;
+    use crate::app::{Config, TestContext};
+    use serial_test::serial;
+    use tokio;
 
     #[tokio::test]
     #[serial]
     async fn install_removes_old_versions_when_package_updates() {
-        // Arrange: temp workspace
-        let temp = tempdir().unwrap();
-        let root = temp.path().to_path_buf();
+        let _ctx = TestContext::new().await;
 
-        // Set config and IO once for the test
-        init_config(&root).await;
+        let minecraft_version = "1.21.11";
+        let mod_id = "modrinth:mod";
+        let v1 = ModFactory::new(mod_id, "1.0.0");
+        let v2 = ModFactory::new(mod_id, "2.0.0");
 
-        // First state: version 1.0.0
-        make_manifest(&root, "1.0.0");
-        let v1_bytes = b"jar-v1";
-        make_lock(&root, "1.0.0", v1_bytes);
-        seed_cache(&root, "1.0.0", v1_bytes);
+        let mut manager = ModManager::new();
+        manager.with_provider("modrinth", Box::new(FakeRepository::new()
+            .with_version(&v1)
+            .with_version(&v2)
+        ));
+        manager.with_download_service(Box::new(FakeDownloadService::new()
+            .with_mod(&v1)
+            .with_mod(&v2)
+        ));
 
-        // Act 1: run install → copies v1 from cache to mods/
-        fs::create_dir_all(root.join("mods")).unwrap();
-        Install::run(false, false).await.expect("install v1 failed");
+        LockfileFactory::new().with_mod(&v1).write();
+        ManifestFactory::new(minecraft_version).with_mod(&v1).write();
+        manager.load().await;
 
-        let v1_path = root.join("mods").join("modrinth:testmod-1.0.0.jar");
+        // Install v1 of the mod
+        Install::run_with_manager(&mut manager, false, false).await.expect("install v1 failed");
+
         assert!(
-            v1_path.exists(),
+            Config::mods_path().join(v1.filename()).exists(),
             "v1 jar does not exist in the mods directory"
         );
 
-        // Second state: bump to version 2.0.0
-        make_manifest(&root, "2.0.0");
-        let v2_bytes = b"jar-v2";
-        make_lock(&root, "2.0.0", v2_bytes);
-        seed_cache(&root, "2.0.0", v2_bytes);
+        LockfileFactory::new().with_mod(&v2).write();
+        ManifestFactory::new(minecraft_version).with_mod(&v2).write();
+        manager.load().await;
 
-        // Act 2: run install again → installs v2 but does not remove v1 (current bug)
-        Install::run(false, false).await.expect("install v2 failed");
+        // Update v1 to v2
+        Install::run_with_manager(&mut manager, false, false).await.expect("install v2 failed");
 
-        let v2_path = root.join("mods").join("modrinth:testmod-2.0.0.jar");
         assert!(
-            v2_path.exists(),
+            Config::mods_path().join(v2.filename()).exists(),
             "v2 jar does not exist in the mods directory"
         );
 
         assert!(
-            !v1_path.exists(),
+            !Config::mods_path().join(v1.filename()).exists(),
             "Old version still present; expected cleanup to remove {}",
-            v1_path.display()
+            v1.filename()
         );
     }
 
-    fn make_manifest(root: &PathBuf, version: &str) {
-        // Minimal, valid manifest that avoids network by using an exact version
-        // and a provider-mapped key "modrinth:testmod".
-        let manifest = serde_json::json!({
-            "name": "Pack",
-            "version": "1.0.0",
-            "side": "both",
-            "modloader": "fabric",
-            "minecraft_version": "1.21.7",
-            "default_provider": "modrinth",
-            "mods": {
-                "modrinth:testmod": version
-            }
-        });
-        write_json(&root.join("mcpm.json"), &manifest);
-    }
+    #[tokio::test]
+    #[serial]
+    async fn install_removes_entries_not_in_manifest_from_lockfile_and_mods_folder() {
+        let _ctx = TestContext::new().await;
 
-    fn make_lock(root: &PathBuf, version: &str, bytes: &[u8]) {
-        let hash = sha512_hex(bytes);
-        let lock = serde_json::json!({
-            "mods": {
-                "modrinth:testmod": {
-                    "id": "modrinth:testmod",
-                    "version": version,
-                    "minecraft_versions": ["1.21.7"],
-                    "url": "https://example.invalid/testmod.jar", // never fetched because cache is used
-                    "hash": hash
-                }
-            }
-        });
-        write_json(&root.join("mcpm.lock"), &lock);
-    }
+        let minecraft_version = "1.21.11";
+        let mod_a = ModFactory::new("modrinth:a", "1.0.0");
+        let mod_b = ModFactory::new("modrinth:b", "1.0.0");
+        mod_a.seed_mod();
+        mod_b.seed_mod();
 
-    fn seed_cache(root: &PathBuf, version: &str, bytes: &[u8]) {
-        let cache_dir = root.join("cache");
-        fs::create_dir_all(&cache_dir).unwrap();
-        let fname = format!("modrinth:testmod-{}.jar", version);
-        fs::write(cache_dir.join(fname), bytes).unwrap();
-    }
+        let mut manager = ModManager::new();
+        manager.with_provider("modrinth", Box::new(FakeRepository::new()
+            .with_version(&mod_a)
+            .with_version(&mod_b)
+        ));
+        manager.with_download_service(Box::new(FakeDownloadService::new()
+            .with_mod(&mod_a)
+            .with_mod(&mod_b)
+        ));
 
-    fn write_json(path: &PathBuf, content: &serde_json::Value) {
-        fs::write(path, serde_json::to_string_pretty(content).unwrap()).unwrap();
-    }
+        LockfileFactory::new()
+            .with_mod(&mod_a)
+            .with_mod(&mod_b)
+            .write();
+        ManifestFactory::new(minecraft_version)
+            .with_mod(&mod_a)
+            .write();
+        manager.load().await;
 
-    fn sha512_hex(bytes: &[u8]) -> String {
-        let mut h = Sha512::new();
-        h.update(bytes);
-        format!("{:x}", h.finalize())
+        Install::run_with_manager(&mut manager, false, false)
+            .await
+            .expect("upgrade after MC bump failed");
+
+        // Reload disk changes
+        manager.load().await;
+
+        assert!(manager.lock_service.lock.mods.contains_key(&mod_a.id));
+        assert!(
+            !manager.lock_service.lock.mods.contains_key(&mod_b.id),
+            "Lockfile still contains mod removed from manifest"
+        );
+
+        assert!(
+            Config::mods_path().join(mod_a.filename()).exists(),
+            "Expected installed mod file missing"
+        );
+        assert!(
+            !Config::mods_path().join(mod_b.filename()).exists(),
+            "Stale mod file was not removed"
+        );
     }
 }

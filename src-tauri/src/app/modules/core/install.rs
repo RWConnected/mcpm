@@ -1,8 +1,5 @@
-use reqwest::Client;
-use sha2::{Digest, Sha512};
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -15,14 +12,23 @@ use crate::app::{
 pub struct Install;
 
 impl Install {
+
     pub async fn run(no_cache: bool, force_rehash: bool) -> Result<(), String> {
+        let mut manager = ModManager::new();
+        manager.load().await;
+        manager.with_default_providers();
+
+        Self::run_with_manager(&mut manager, no_cache, force_rehash).await
+    }
+
+    pub async fn run_with_manager(
+        manager: &mut ModManager,
+        no_cache: bool,
+        force_rehash: bool
+    ) -> Result<(), String> {
         let io = use_io();
 
-        let mut manager = ModManager::load()
-            .await
-            .map_err(|e| format!("Failed to initialize ModManager: {}", e))?;
-
-        let mods = manager.manifest.mods_as_entries();
+        let mods = manager.manifest_mod_entries();
 
         for entry in &mods {
             manager
@@ -30,6 +36,8 @@ impl Install {
                 .await
                 .map_err(|e| format!("Failed to resolve {}: {}", entry.slug, e))?;
         }
+
+        manager.lock_service.prune(&manager.manifest_service.manifest);
 
         manager
             .save_all()
@@ -69,7 +77,8 @@ impl Install {
             let dest = if no_cache { &target_path } else { &cache_path };
             if !dest.exists() || force_rehash {
                 io.info(&format!("Downloading {} {}", key, entry.version));
-                Self::download_to(dest, &entry.url, &entry.hash).await?;
+                manager.download_service.download(&entry.url, dest, &entry.hash).await
+                    .expect(&format!("Failed to download {}", entry.id));
             }
 
             if !no_cache {
@@ -104,26 +113,5 @@ impl Install {
         let actual = format!("{:x}", hasher.finalize());
 
         Ok(actual == expected)
-    }
-
-    pub async fn download_to(path: &Path, url: &str, expected_hash: &str) -> Result<(), String> {
-        let bytes = Client::new()
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .bytes()
-            .await
-            .map_err(|e| e.to_string())?;
-        let mut file = fs::File::create(path).map_err(|e| e.to_string())?;
-        file.write_all(&bytes).map_err(|e| e.to_string())?;
-
-        let mut hasher = Sha512::new();
-        hasher.update(&bytes);
-        let actual_hash = format!("{:x}", hasher.finalize());
-        if actual_hash != expected_hash {
-            return Err(format!("Hash mismatch for {:?}", path));
-        }
-        Ok(())
     }
 }

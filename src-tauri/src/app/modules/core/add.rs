@@ -7,7 +7,7 @@ use crate::app::{
     modules::{
         core::ops::manager::ModManager,
         manifest::models::{ModEntry, Provider, VersionSpec},
-        repositories::{models::VersionResult, modrinth::ModrinthRepository, RepositoryService},
+        repositories::{models::VersionResult, RepositoryService},
     },
 };
 
@@ -21,13 +21,14 @@ impl Add {
         exact: bool,
         search: bool,
     ) -> Result<(), String> {
-        let mut manager = ModManager::load()
-            .await
-            .map_err(|e| format!("Failed to initialize ModManager: {}", e))?;
+        let mut manager = ModManager::new();
+        manager.load().await;
 
-        let provider = provider.unwrap_or(manager.manifest.default_provider.clone());
-        let repo_service =
-            RepositoryService::new().with_provider("modrinth", Box::new(ModrinthRepository::new()));
+        let provider = provider.unwrap_or(
+            manager.manifest_service.manifest.default_provider.clone()
+        );
+        let mut repo_service = RepositoryService::new();
+        repo_service.with_default_providers();
 
         let project = if search {
             pick_with_pagination(
@@ -50,15 +51,17 @@ impl Add {
         let versions = repo_service
             .get_versions(
                 &project.id,
-                &[manager.manifest.minecraft_version.clone()],
-                &[as_str(&manager.manifest.modloader)],
+                &[manager.manifest_service.manifest.minecraft_version.clone()],
+                &[as_str(&manager.manifest_service.manifest.modloader)],
             )
             .await;
 
         if versions.is_empty() {
             return Err(format!(
                 "No compatible versions found for '{}' with Minecraft {} + {:?}",
-                project.name, manager.manifest.minecraft_version, manager.manifest.modloader
+                project.name,
+                manager.manifest_service.manifest.minecraft_version,
+                manager.manifest_service.manifest.modloader
             ));
         }
 
@@ -66,7 +69,7 @@ impl Add {
             &version,
             &versions,
             &project.name,
-            &manager.manifest.minecraft_version,
+            &manager.manifest_service.manifest.minecraft_version,
         )
         .ok_or_else(|| "Version selection cancelled".to_string())?;
 
@@ -78,7 +81,7 @@ impl Add {
             provider: provider.clone(),
         };
 
-        manager.manifest.insert_mod_entry(&entry);
+        manager.manifest_service.manifest.insert_mod_entry(&entry);
 
         manager
             .refresh_mod(&entry, Some(&versions), false, false)

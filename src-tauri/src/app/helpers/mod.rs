@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod semver;
-pub mod test_utils;
+#[cfg(test)]
+pub mod factories;
 
 use serde::Serialize;
 

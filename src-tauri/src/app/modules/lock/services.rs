@@ -7,7 +7,7 @@ use crate::app::{helpers::{
     manifest::models::{Manifest, ModEntry, VersionSpec},
     repositories::{models::VersionResult, RepositoryService},
 }, Config};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub struct LockService {
     pub lock: LockFile,
@@ -18,16 +18,23 @@ impl LockService {
         Config::lock_path().exists()
     }
 
-    pub fn load() -> Self {
+    pub fn new() -> Self {
+        Self {
+            lock: LockFile {
+                mods: HashMap::new(),
+            },
+        }
+    }
+
+    pub fn load(&mut self) -> std::io::Result<()> {
         let path = Config::lock_path();
-        let lock = std::fs::read_to_string(path)
+        self.lock = std::fs::read_to_string(path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or(LockFile {
                 mods: HashMap::new(),
             });
-
-        Self { lock }
+        Ok(())
     }
 
     pub fn save(&self) -> std::io::Result<()> {
@@ -117,9 +124,9 @@ impl LockService {
                         hash: resolved.hash,
                     },
                 );
-                if (upgrade) {
+                if upgrade {
                     manifest.mods.get_mut(&key).map(|v| {
-                        *v = match (v) {
+                        *v = match v {
                             VersionSpec::Exact(_) => VersionSpec::Exact(resolved.version),
                             VersionSpec::Range(_) => VersionSpec::Range("^".to_string() + &resolved.version),
                         }
@@ -140,23 +147,17 @@ impl LockService {
         return true;
     }
 
-    // Use this in install and upgrade commands
-    pub async fn refresh(
-        &mut self,
-        manifest: &mut Manifest,
-        repo_service: &RepositoryService,
-        upgrade: bool,
-    ) -> bool {
-        let mut success = true;
-        for m in &manifest.mods_as_entries() {
-            if !self
-                .update_entry(m, manifest, repo_service, None, upgrade, false)
-                .await
-            {
-                success = false;
-            }
-        }
-        return success;
+    pub(crate) fn prune(&mut self, manifest: &Manifest,) -> HashSet<String> {
+        let manifest_keys: HashSet<String> = manifest.mods.keys().cloned().collect();
+
+        let mut removed = HashSet::new();
+        self.lock.mods.retain(|k, _| {
+            let keep = manifest_keys.contains(k);
+            if !keep { removed.insert(k.clone()); }
+            keep
+        });
+
+        removed
     }
 
     pub fn get_version(&self, manifest_mod: &ModEntry) -> Option<String> {

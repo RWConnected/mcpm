@@ -9,11 +9,11 @@ impl List {
     pub async fn run() -> Result<(), String> {
         let io = use_io();
 
-        let mut manager = ModManager::load()
-            .await
-            .map_err(|e| format!("Failed to initialize ModManager: {}", e))?;
+        let mut manager = ModManager::new();
+        manager.load().await;
+        manager.with_default_providers();
 
-        let mods = manager.manifest.mods_as_entries();
+        let mods = manager.manifest_service.manifest.mods_as_entries();
 
         if mods.is_empty() {
             io.info("No mods installed.");

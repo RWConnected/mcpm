@@ -8,11 +8,15 @@ use std::path::Path;
 
 const RECOMMENDED_IGNORES: [&str; 4] = ["mods/", "crash-reports/", "logs/", "saves/"];
 
-pub struct ManifestService;
+pub struct ManifestService {
+    pub manifest: Manifest
+}
 
 impl ManifestService {
     pub fn new() -> Self {
-        Self
+        Self {
+            manifest: Manifest::default()
+        }
     }
 
     /// Initialize a manifest (create or normalize) and handle .gitignore
@@ -21,7 +25,7 @@ impl ManifestService {
         let gitignore_path = Config::gitignore_path();
 
         if !manifest_path.exists() {
-            self.create()?;
+            self.save()?;
         } else {
             self.normalize(&manifest_path)?;
         }
@@ -35,31 +39,19 @@ impl ManifestService {
     /// - If file missing: returns Err(io::ErrorKind::NotFound).  
     /// - If malformed: returns Err(io::ErrorKind::InvalidData).  
     /// - If partial: normalizes into full Manifest.  
-    pub fn load(&self) -> io::Result<Manifest> {
+    pub fn load(&mut self) -> io::Result<()> {
         let path = Config::manifest_path();
 
         let content = fs::read_to_string(path)?;
         let partial: PartialManifest = serde_json::from_str(&content)?;
-        Ok(Manifest::merge(partial))
-    }
-
-    /// Save the manifest to disk
-    pub fn save(&self, manifest: &Manifest) -> io::Result<()> {
-        let path = Config::manifest_path();
-
-        let json = serde_json::to_string_pretty(manifest)?;
-        fs::write(path, json)?;
+        self.manifest = Manifest::merge(partial);
         Ok(())
     }
 
-    /// Create a new manifest with defaults
-    pub fn create(&self) -> std::io::Result<()> {
-        let path = Config::manifest_path();
-        let io = use_io();
-
-        let manifest = Manifest::default();
-        self.save(&manifest)?;
-        io.success(&format!("Created {}", path.display()));
+    /// Save the manifest to disk
+    pub fn save(&self) -> io::Result<()> {
+        let json = serde_json::to_string_pretty(&self.manifest)?;
+        fs::write(Config::manifest_path(), json)?;
         Ok(())
     }
 

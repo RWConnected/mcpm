@@ -26,16 +26,15 @@ pub struct Outdated;
 
 impl Outdated {
     pub async fn run(mods: Vec<String>) -> Result<OutdatedResult, String> {
-        let mut manager = ModManager::load()
-            .await
-            .map_err(|e| format!("Failed to initialize ModManager: {}", e))?;
+        let mut manager = ModManager::new();
+        manager.load().await;
+        manager.with_default_providers();
 
         let to_check: Vec<_> = if mods.is_empty() {
-            manager.manifest.mods_as_entries()
+            manager.manifest_mod_entries()
         } else {
             manager
-                .manifest
-                .mods_as_entries()
+                .manifest_mod_entries()
                 .into_iter()
                 .filter(|m| mods.iter().any(|q| m.slug.contains(q)))
                 .collect()
@@ -79,8 +78,8 @@ impl Outdated {
             .repo_service
             .get_versions(
                 &key,
-                &[manager.manifest.minecraft_version.clone()],
-                &[as_str(&manager.manifest.modloader)],
+                &[manager.manifest_service.manifest.minecraft_version.clone()],
+                &[as_str(&manager.manifest_service.manifest.modloader)],
             )
             .await;
         if versions.is_empty() {

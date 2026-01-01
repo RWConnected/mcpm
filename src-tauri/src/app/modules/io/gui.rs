@@ -43,15 +43,15 @@ impl Output for GuiIO {
 
 #[async_trait]
 impl Input for GuiIO {
-    async fn prompt(&self, message: &str, default: Option<String>) -> PromptResult<String> {
+    async fn prompt(&self, _message: &str, default: Option<String>) -> PromptResult<String> {
         // TODO: Implement GUI modal prompt
-        return match default {
+        match default {
             Some(v) => PromptResult::Response(v),
             None => PromptResult::Cancel,
-        };
+        }
     }
-    async fn confirm(&self, message: &str, default: bool) -> PromptResult<bool> {
-        return PromptResult::Response(default);
+    async fn confirm(&self, _message: &str, default: bool) -> PromptResult<bool> {
+        PromptResult::Response(default)
     }
 
     // TODO: Implement warn and error prompts when needed

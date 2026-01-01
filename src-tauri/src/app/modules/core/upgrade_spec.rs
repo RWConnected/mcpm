@@ -1,48 +1,41 @@
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
     use serial_test::serial;
-    use tempfile::tempdir;
 
-    use tokio;
-
-    use crate::app::helpers::test_utils::{init_config, make_lock, make_manifest};
+    use crate::app::helpers::factories::FakeRepository;
+    use crate::app::helpers::factories::{LockfileFactory, ManifestFactory, ModFactory};
+    use crate::app::modules::core::download::FakeDownloadService;
     use crate::app::modules::{
         core::ops::manager::ModManager,
         core::upgrade::Upgrade,
-        repositories::{fake::FakeRepository, models::VersionResult, RepositoryService},
     };
+    use crate::app::TestContext;
+    use tokio;
 
     #[tokio::test]
     #[serial]
     async fn upgrade_does_not_upgrade_pinned_mod_versions() {
-        // Setup
-        let temp = tempdir().unwrap();
-        let root = temp.path().to_path_buf();
+        let _ctx = TestContext::new().await;
 
-        init_config(&root).await;
+        let mod_id = "modrinth:rwc-gui-shop";
+        let initial_version = ModFactory::new(mod_id, "2.0.0+1.21.5");
+        let other_version = ModFactory::new(mod_id, "2.0.1+1.21.11");
 
-        let initial_version = "2.0.0+1.21.5";
-        let other_version = "2.0.1+1.21.11";
+        let mut manager = ModManager::new();
+        manager.with_provider("modrinth", Box::new(FakeRepository::new()
+            .with_version(&initial_version)
+            .with_version(&other_version)
+        ));
+        manager.with_download_service(Box::new(FakeDownloadService::new()
+            .with_mod(&initial_version)
+            .with_mod(&other_version)
+        ));
 
-        let mut mods = IndexMap::new();
-        mods.insert("modrinth:rwc-gui-shop".into(), initial_version.into());
-
-        make_manifest(&root, "1.21.11", &mods);
-        make_lock(&root, &mods);
-
-        let fake_repo = FakeRepository::new().with_versions(vec![
-            version(initial_version, &["1.21.5"]),
-            version(other_version, &["1.21.11"]),
-        ]);
-
-        let mut manager = ModManager::load().await.unwrap();
-        manager.repo_service =
-            RepositoryService::new().with_provider("modrinth", Box::new(fake_repo));
-
-        // test
+        ManifestFactory::new("1.21.11").with_mod(&initial_version).write();
+        LockfileFactory::new().with_mod(&initial_version).write();
+        manager.load().await;
         
-        let r1 = Upgrade::run_with_manager(manager, &[], false)
+        let r1 = Upgrade::run_with_manager(&mut manager, &[], false)
             .await
             .expect("upgrade failed");
 
@@ -52,52 +45,38 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn upgrade_ignores_version_constrains_when_told_to() {
-        // setup
-        let temp = tempdir().unwrap();
-        let root = temp.path().to_path_buf();
+        let _ctx = TestContext::new().await;
 
-        init_config(&root).await;
+        let mod_id = "modrinth:rwc-gui-shop";
+        let initial = ModFactory::new(mod_id, "2.0.0+1.21.5")
+            .for_mc_versions(&["1.21.5"]);
+        let desired = ModFactory::new(mod_id, "2.0.1+1.21.11")
+            .for_mc_versions(&["1.21.11"]);
 
-        let initial_version = "2.0.0+1.21.5";
-        let desired_version = "2.0.1+1.21.11";
+        let mut manager = ModManager::new();
+        manager.with_provider("modrinth", Box::new(FakeRepository::new()
+            .with_version(&initial)
+            .with_version(&desired)
+        ));
+        manager.with_download_service(Box::new(FakeDownloadService::new()
+            .with_mod(&initial)
+            .with_mod(&desired)
+        ));
 
-        let mut mods = IndexMap::new();
-        mods.insert("modrinth:rwc-gui-shop".into(), initial_version.into());
-
-        make_manifest(&root, "1.21.11", &mods);
-        make_lock(&root, &mods);
-
-        let fake_repo = FakeRepository::new().with_versions(vec![
-            version(initial_version, &["1.21.5"]),
-            version(desired_version, &["1.21.11"]),
-        ]);
-
-        let mut manager = ModManager::load().await.unwrap();
-        manager.repo_service =
-            RepositoryService::new().with_provider("modrinth", Box::new(fake_repo));
+        ManifestFactory::new("1.21.11").with_mod(&initial).write();
+        LockfileFactory::new().with_mod(&initial).write();
+        manager.load().await;
 
         // test
 
-        let r2 = Upgrade::run_with_manager(manager, &[], true)
+        let r2 = Upgrade::run_with_manager(&mut manager, &[], true)
             .await
             .expect("upgrade after MC bump failed");
 
         assert_eq!(r2.upgraded.len(), 1);
 
         let (_, before, after) = &r2.upgraded[0];
-        assert_eq!(before.as_deref(), Some(initial_version));
-        assert_eq!(after.as_deref(), Some(desired_version));
-    }
-
-    // ── Helpers ─────────────────────────────────────────────────────────────
-
-    fn version(v: &str, mc: &[&str]) -> VersionResult {
-        VersionResult {
-            mod_id: "rwc-gui-shop".into(),
-            version: v.into(),
-            minecraft_versions: mc.iter().map(|s| s.to_string()).collect(),
-            url: "https://example.invalid".into(),
-            hash: "deadbeef".into(),
-        }
+        assert_eq!(before.as_deref(), Some(initial.version.as_str()));
+        assert_eq!(after.as_deref(), Some(desired.version.as_str()));
     }
 }

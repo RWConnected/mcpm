@@ -10,19 +10,19 @@ pub struct Upgrade;
 
 impl Upgrade {
     pub async fn run(mods: &[String], ignore_constraints: bool) -> Result<UpgradeResult, String> {
-        let manager = ModManager::load()
-            .await
-            .map_err(|e| format!("Failed to initialize ModManager: {}", e))?;
+        let mut manager = ModManager::new();
+        manager.load().await;
+        manager.with_default_providers();
 
-        Self::run_with_manager(manager, mods, ignore_constraints).await
+        Self::run_with_manager(&mut manager, mods, ignore_constraints).await
     }
 
     pub async fn run_with_manager(
-        mut manager: ModManager,
+        manager: &mut ModManager,
         mods: &[String],
         ignore_constraints: bool,
     ) -> Result<UpgradeResult, String> {
-        let all_mods = manager.manifest.mods_as_entries();
+        let all_mods = manager.manifest_mod_entries();
         let to_upgrade: Vec<_> = if mods.is_empty() {
             all_mods
         } else {

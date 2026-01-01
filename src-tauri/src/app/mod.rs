@@ -3,6 +3,11 @@ mod config;
 pub mod helpers;
 pub mod modules;
 
+#[cfg(test)]
+mod test;
+#[cfg(test)]
+pub use test::TestContext;
+
 pub use config::Config;
 
 pub static mut INTERACTIVE: bool = false;

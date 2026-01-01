@@ -1,38 +1,34 @@
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
     use serial_test::serial;
     use std::fs;
-    use tempfile::tempdir;
 
-    use tokio;
-
-    use crate::app::helpers::test_utils::{init_config, make_lock, make_manifest};
+    use crate::app::helpers::factories::{LockfileFactory, ManifestFactory, ModFactory};
     use crate::app::modules::core::ops::manager::ModManager;
+    use crate::app::{Config, TestContext};
+    use tokio;
 
     #[tokio::test]
     #[serial]
     async fn lockfile_mods_are_sorted_by_name() {
-        let temp = tempdir().unwrap();
-        let root = temp.path().to_path_buf();
-
-        init_config(&root).await;
+        let _ctx = TestContext::new().await;
 
         // Manifest order intentionally scrambled
-        let mut mods = IndexMap::new();
-        mods.insert("modrinth:z-mod".into(), "1.0.0".into());
-        mods.insert("modrinth:a-mod".into(), "1.0.0".into());
-        mods.insert("modrinth:m-mod".into(), "1.0.0".into());
+        let mut mods = Vec::new();
+        mods.push(ModFactory::new("modrinth:z-mod", "1.0.0"));
+        mods.push(ModFactory::new("modrinth:a-mod", "1.0.0"));
+        mods.push(ModFactory::new("modrinth:m-mod", "1.0.0"));
 
-        make_manifest(&root, "1.21.11", &mods);
-        make_lock(&root, &mods);
+        ManifestFactory::new("1.21.11").with_mods(&mods).write();
+        LockfileFactory::new().with_mods(&mods).write();
 
         // Load + save to trigger MCPM's lockfile serialization
-        let manager = ModManager::load().await.unwrap();
+        let mut manager = ModManager::new();
+        manager.load().await;
         manager.save_all().unwrap();
 
         // Assert lockfile ordering
-        let lock = fs::read_to_string(root.join("mcpm.lock")).unwrap();
+        let lock = fs::read_to_string(Config::lock_path()).unwrap();
 
         let a = lock.find("modrinth:a-mod").unwrap();
         let m = lock.find("modrinth:m-mod").unwrap();
@@ -48,28 +44,26 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn manifest_mod_order_is_preserved() {
-        let temp = tempdir().unwrap();
-        let root = temp.path().to_path_buf();
+        let _ctx = TestContext::new().await;
 
-        init_config(&root).await;
+        let mut mods = Vec::new();
+        mods.push(ModFactory::new("modrinth:z-mod", "1.0.0"));
+        mods.push(ModFactory::new("modrinth:a-mod", "1.0.0"));
+        mods.push(ModFactory::new("modrinth:m-mod", "1.0.0"));
+        mods.push(ModFactory::new("modrinth:i-mod", "1.0.0"));
 
-        // Manifest order intentionally scrambled
-        let mut mods = IndexMap::new();
-        mods.insert("modrinth:z-mod".into(), "1.0.0".into());
-        mods.insert("modrinth:a-mod".into(), "1.0.0".into());
-        mods.insert("modrinth:m-mod".into(), "1.0.0".into());
-        mods.insert("modrinth:i-mod".into(), "1.0.0".into());
+        ManifestFactory::new("1.21.11").with_mods(&mods).write();
+        LockfileFactory::new().with_mods(&mods).write();
 
-        make_manifest(&root, "1.21.11", &mods);
-        make_lock(&root, &mods);
-        let expected_manifest = fs::read_to_string(root.join("mcpm.json")).unwrap();
+        let expected_manifest = fs::read_to_string(Config::manifest_path()).unwrap();
 
         // Load + save to trigger MCPM's manifest file serialization
-        let manager = ModManager::load().await.unwrap();
+        let mut manager = ModManager::new();
+        manager.load().await;
         manager.save_all().unwrap();
 
         // Assert manifest ordering
-        let manifest = fs::read_to_string(root.join("mcpm.json")).unwrap();
+        let manifest = fs::read_to_string(Config::manifest_path()).unwrap();
 
         let a = manifest.find("modrinth:z-mod").unwrap();
         let b = manifest.find("modrinth:a-mod").unwrap();

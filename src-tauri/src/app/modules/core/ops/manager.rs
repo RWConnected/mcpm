@@ -1,31 +1,55 @@
+use crate::app::modules::core::download::{DownloadService, HttpDownloadService};
+use crate::app::modules::repositories::interfaces::IRepository;
 use crate::app::modules::{
     lock::services::LockService,
     manifest::{models::ModEntry, ManifestService},
     repositories::{models::VersionResult, modrinth::ModrinthRepository, RepositoryService},
 };
+use crate::app::Config;
 use std::io::Result;
 
 pub struct ModManager {
     pub manifest_service: ManifestService,
-    pub manifest: crate::app::modules::manifest::models::Manifest,
     pub lock_service: LockService,
     pub repo_service: RepositoryService,
+    pub download_service: Box<dyn DownloadService>,
 }
 
 impl ModManager {
-    pub async fn load() -> Result<Self> {
-        let manifest_service = ManifestService::new();
-        let manifest = manifest_service.load()?;
-        let repo_service =
-            RepositoryService::new().with_provider("modrinth", Box::new(ModrinthRepository::new()));
-        let lock_service = LockService::load();
 
-        Ok(Self {
-            manifest_service,
-            manifest,
-            lock_service,
-            repo_service,
-        })
+    pub fn new() -> Self {
+        Self {
+            manifest_service: ManifestService::new(),
+            lock_service: LockService::new(),
+            repo_service: RepositoryService::new(),
+            download_service: Box::new(HttpDownloadService),
+        }
+    }
+
+    pub fn with_default_providers(&mut self) -> &Self {
+        self.repo_service.with_provider("modrinth", Box::new(ModrinthRepository::new()));
+        self
+    }
+
+    pub fn with_provider(&mut self, name: &str, provider: Box<dyn IRepository>) -> &Self {
+        self.repo_service.with_provider(name, provider);
+        self
+    }
+
+    pub fn with_download_service(&mut self, service: Box<dyn DownloadService>) -> &Self {
+        self.download_service = service;
+        self
+    }
+
+    pub async fn load(&mut self) {
+        self.lock_service.load()
+            .expect(&format!("Failed to load {}", Config::lock_path().display()));
+        self.manifest_service.load()
+            .expect(&format!("Failed to load {}", Config::manifest_path().display()));
+    }
+
+    pub fn manifest_mod_entries(&self) -> Vec<ModEntry> {
+        self.manifest_service.manifest.mods_as_entries()
     }
 
     pub async fn refresh_mod(
@@ -39,7 +63,7 @@ impl ModManager {
             .lock_service
             .update_entry(
                 entry,
-                &mut self.manifest,
+                &mut self.manifest_service.manifest,
                 &self.repo_service,
                 available,
                 upgrade,
@@ -56,7 +80,7 @@ impl ModManager {
     }
 
     pub fn save_all(&self) -> Result<()> {
-        self.manifest_service.save(&self.manifest)?;
+        self.manifest_service.save()?;
         self.lock_service.save()?;
         Ok(())
     }

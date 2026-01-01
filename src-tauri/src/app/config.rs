@@ -66,6 +66,10 @@ impl Config {
     pub fn reset_for_tests() {
         *CONFIG.lock().unwrap() = None;
     }
+
+    pub fn cache_path() -> PathBuf {
+        Self::get().cache_dir.clone()
+    }
     pub fn output_dir() -> PathBuf {
         Self::get().output_dir.clone()
     }
@@ -84,6 +88,10 @@ impl Config {
 
     pub fn gitignore_path() -> PathBuf {
         Self::project_dir().join(".gitignore")
+    }
+
+    pub fn mods_path() -> PathBuf {
+        Self::get().mods_dir.clone()
     }
 
     fn resolve_cache_dir(cli_cache: Option<String>) -> PathBuf {

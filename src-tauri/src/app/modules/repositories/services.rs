@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-
-use crate::app::modules::repositories::models::VersionResult;
-
 use super::interfaces::IRepository;
 use super::models::ModResult;
+use crate::app::modules::repositories::models::VersionResult;
+use crate::app::modules::repositories::modrinth::ModrinthRepository;
+use std::collections::HashMap;
 
 pub struct RepositoryService {
     repositories: HashMap<String, Box<dyn IRepository>>,
@@ -16,7 +15,12 @@ impl RepositoryService {
         }
     }
 
-    pub fn with_provider(mut self, name: &str, provider: Box<dyn IRepository>) -> Self {
+    pub fn with_default_providers(&mut self) -> &Self {
+        self.with_provider("modrinth", Box::new(ModrinthRepository::new()));
+        self
+    }
+
+    pub fn with_provider(&mut self, name: &str, provider: Box<dyn IRepository>) -> &Self {
         self.repositories.insert(name.to_lowercase(), provider);
         self
     }
