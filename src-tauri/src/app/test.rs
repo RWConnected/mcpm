@@ -37,6 +37,7 @@ impl TestContext {
             output_dir: Some(root.to_string_lossy().to_string()),
             mods_dir: Some(mods_dir.to_string_lossy().to_string()),
             command: None,
+            modrinth_token: None,
         };
 
         Config::reset_for_tests();

@@ -12,6 +12,7 @@ pub struct Config {
     pub project_dir: PathBuf,
     pub output_dir: PathBuf,
     pub mods_dir: PathBuf,
+    pub modrinth_token: Option<String>,
 }
 
 static CONFIG: Lazy<Mutex<Option<Config>>> =
@@ -25,6 +26,10 @@ impl Config {
         let mods_dir = Self::resolve_mods_dir(cli.mods_dir.clone(), &output_dir);
         let verbose = cli.verbose.clone();
         let quiet = cli.quiet.clone();
+        let modrinth_token = Self::resolve_optional_param(
+            &cli.modrinth_token,
+            "MCPM_MODRINTH_TOKEN",
+        );
 
         fs::create_dir_all(&cache_dir).expect(
             &format!("Failed to create cache directory at {}", cache_dir.display())
@@ -48,6 +53,7 @@ impl Config {
             project_dir,
             output_dir,
             mods_dir,
+            modrinth_token
         });
     }
 
@@ -93,6 +99,9 @@ impl Config {
     pub fn mods_path() -> PathBuf {
         Self::get().mods_dir.clone()
     }
+    pub fn modrinth_token() -> Option<String> {
+        Self::get().modrinth_token.clone()
+    }
 
     fn resolve_cache_dir(cli_cache: Option<String>) -> PathBuf {
         if let Some(c) = cli_cache {
@@ -133,6 +142,16 @@ impl Config {
             &current_dir,
             None
         )
+    }
+
+    fn resolve_optional_param(param: &Option<String>, env_key: &str) -> Option<String> {
+        if let Some(p) = param {
+            return Some(p.to_string());
+        }
+        if let Ok(env_path) = env::var(env_key) {
+            return Some(env_path);
+        }
+        None
     }
 
     fn resolve_relative_to(

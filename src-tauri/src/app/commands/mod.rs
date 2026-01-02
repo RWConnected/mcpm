@@ -45,6 +45,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub mods_dir: Option<String>,
 
+    /// Modrinth API bearer token (env: MCPM_MODRINTH_TOKEN, default: none)
+    #[arg(long, global = true)]
+    pub modrinth_token: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }

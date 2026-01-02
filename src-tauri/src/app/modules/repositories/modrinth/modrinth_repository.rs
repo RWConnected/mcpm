@@ -1,18 +1,15 @@
 use super::super::interfaces::IRepository;
 use super::super::models::ModResult;
 use super::models::SearchResponse;
-use crate::app::{
-    modules::{
-        manifest::models::Side,
-        repositories::{
-            models::VersionResult,
-            modrinth::models::{FindResponse, VersionItem},
-        },
+use crate::app::{modules::{
+    manifest::models::Side,
+    repositories::{
+        models::VersionResult,
+        modrinth::models::{FindResponse, VersionItem},
     },
-    PAGINATION_SIZE,
-};
+}, Config, PAGINATION_SIZE};
 use async_trait::async_trait;
-use reqwest::Client;
+use reqwest::{Client, header};
 
 pub struct ModrinthRepository {
     client: Client,
@@ -20,8 +17,24 @@ pub struct ModrinthRepository {
 
 impl ModrinthRepository {
     pub fn new() -> Self {
+        let mut headers = header::HeaderMap::new();
+
+        if let Some(token) = Config::modrinth_token() {
+            let value = format!("Bearer {}", token);
+            headers.insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str(&value)
+                    .expect("Invalid Modrinth token"),
+            );
+        }
+
+        let client = Client::builder()
+            .default_headers(headers)
+            .build()
+            .expect("Failed to build Modrinth HTTP client");
+
         Self {
-            client: Client::new(),
+            client,
         }
     }
 }
