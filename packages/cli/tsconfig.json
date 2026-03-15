@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "paths": {
+      "@mcpm/core": ["../core/src/index.ts"],
+      "@mcpm/core/*": ["../core/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

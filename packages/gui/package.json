@@ -1,0 +1,12 @@
+{
+  "name": "@mcpm/gui",
+  "version": "1.0.7",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mcpm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
