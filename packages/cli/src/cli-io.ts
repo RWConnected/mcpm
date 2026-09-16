@@ -1,6 +1,6 @@
 import pc from "picocolors";
-import type { IO, IOConfig, PromptResult } from "@mcpm/core";
-import { promptResponse, promptCancel } from "@mcpm/core";
+import type {IO, IOConfig, PromptResult} from "@mcpm/core";
+import {promptCancel, promptResponse} from "@mcpm/core";
 
 export class CliIO implements IO {
   constructor(private readonly cfg: IOConfig) {}
@@ -10,29 +10,29 @@ export class CliIO implements IO {
   }
 
   debug(msg: string): void {
-    if (this.cfg.verbose) console.log(`${pc.bold(pc.magenta("[DEBUG]")).padEnd(16)}${msg}`);
+    if (this.cfg.verbose) console.log(`${pc.bold(pc.magenta("[DEBUG]"))} ${msg}`);
   }
 
   print(msg: string): void {
-    if (!this.cfg.quiet) console.log(`${"".padEnd(8)}${msg}`);
+    if (!this.cfg.quiet) console.log(msg);
   }
 
   info(msg: string): void {
-    if (!this.cfg.quiet) console.log(`${pc.bold(pc.blue("[INFO]")).padEnd(16)}${msg}`);
+    if (!this.cfg.quiet) console.log(`${pc.bold(pc.blue("[INFO]"))} ${msg}`);
   }
 
   success(msg: string): void {
-    if (!this.cfg.quiet) console.log(`${pc.bold(pc.green("[OK]")).padEnd(16)}${msg}`);
+    if (!this.cfg.quiet) console.log(`${pc.bold(pc.green("[OK]"))} ${msg}`);
   }
 
   warn(msg: string): void {
-    console.error(`${pc.bold(pc.yellow("[WARNING]")).padEnd(16)}${msg}`);
+    console.error(`${pc.bold(pc.yellow("[WARNING]"))} ${msg}`);
   }
 
   error(msg: string, err?: Error): void {
     const prefix = pc.bold(pc.red("[ERROR]"));
-    if (err) console.error(`${prefix.padEnd(16)}${msg}: ${err.message}`);
-    else console.error(`${prefix.padEnd(16)}${msg}`);
+    if (err) console.error(`${prefix} ${msg}: ${err.message}`);
+    else console.error(`${prefix} ${msg}`);
   }
 
   async prompt(_question: string, defaultValue?: string): Promise<PromptResult<string>> {

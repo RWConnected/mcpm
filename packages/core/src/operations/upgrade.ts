@@ -1,10 +1,12 @@
 // Upgrade operation ported from src-tauri/src/app/modules/core/upgrade.rs
 
-import type { ModManager } from "./mod-manager.js";
+import type {ModManager} from "./mod-manager.js";
+import {disableModEntry, modEntryToKey} from "../models/manifest.js";
 
 export interface UpgradeResult {
   upgraded: Array<[string, string | undefined, string | undefined]>; // [key, before, after]
   unchanged: number;
+  disabled: string[]; // keys disabled because no compatible version was found
 }
 
 export class Upgrade {
@@ -12,6 +14,7 @@ export class Upgrade {
     manager: ModManager,
     mods: string[],
     ignoreConstraints: boolean,
+    disableUnresolved = false,
   ): Promise<UpgradeResult> {
     const allMods = manager.manifestModEntries();
 
@@ -26,24 +29,44 @@ export class Upgrade {
     // Snapshot current versions
     const beforeVersions = new Map<string, string>();
     for (const entry of toUpgrade) {
-      const key = `${entry.provider}:${entry.slug}`;
+      const key = modEntryToKey(entry);
       const v = manager.lockService.getVersion(entry);
       if (v) beforeVersions.set(key, v);
     }
 
     // Refresh each mod with upgrade=true
+    const disabled: string[] = [];
     for (const entry of toUpgrade) {
-      await manager.refreshMod(entry, undefined, true, ignoreConstraints);
+      const success = await manager.lockService.updateEntry(
+        entry,
+        manager.manifestService.manifest,
+        manager.repoService,
+        undefined,
+        true,
+        ignoreConstraints,
+      );
+
+      if (!success) {
+        if (!disableUnresolved) {
+          throw new Error(`Failed to update ${entry.slug}`);
+        }
+        if (disableModEntry(manager.manifestService.manifest, entry)) {
+          disabled.push(modEntryToKey(entry));
+        }
+      }
     }
 
     manager.saveAll();
 
     // Compare snapshots
     const upgraded: Array<[string, string | undefined, string | undefined]> = [];
+    const disabledKeys = new Set(disabled);
     let unchanged = 0;
 
     for (const entry of toUpgrade) {
-      const key = `${entry.provider}:${entry.slug}`;
+      const key = modEntryToKey(entry);
+      if (disabledKeys.has(key)) continue;
+
       const before = beforeVersions.get(key);
       const after = manager.lockService.getVersion(entry);
 
@@ -54,6 +77,6 @@ export class Upgrade {
       }
     }
 
-    return { upgraded, unchanged };
+    return { upgraded, unchanged, disabled };
   }
 }

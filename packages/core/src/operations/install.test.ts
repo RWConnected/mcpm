@@ -1,13 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync } from "fs";
-import { join } from "path";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import {existsSync} from "fs";
+import {join} from "path";
 import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory,
-  FakeRepository, FakeDownloadService,
+  FakeDownloadService,
+  FakeRepository,
+  LockfileFactory,
+  ManifestFactory,
+  ModFactory,
+  TestContext,
 } from "../testing/index.js";
-import { ModManager } from "./mod-manager.js";
-import { Install } from "./install.js";
-import { RepositoryService } from "../repositories/repository-service.js";
+import {ModManager} from "./mod-manager.js";
+import {Install} from "./install.js";
+import {RepositoryService} from "../repositories/repository-service.js";
 
 function createManager(ctx: TestContext, repo: FakeRepository, dl: FakeDownloadService): ModManager {
   const repoService = new RepositoryService();
@@ -85,5 +89,30 @@ describe("Install", () => {
 
     expect(existsSync(join(ctx.config.modsDir, modA.filename))).toBe(true);
     expect(existsSync(join(ctx.config.modsDir, modB.filename))).toBe(false);
+  });
+
+  it("does not download a disabled mod and removes it if already present", async () => {
+    const mcVersion = "1.21.11";
+    const mod = ModFactory.create("modrinth:sodium", "1.0.0");
+    mod.seedMod(ctx.config);
+
+    const repo = new FakeRepository().withVersion(mod);
+    const dl = new FakeDownloadService().withMod(mod);
+    const manager = createManager(ctx, repo, dl);
+
+    LockfileFactory.create().withMod(mod).writeTo(ctx.paths);
+    ManifestFactory.create(mcVersion).withMod(mod).writeTo(ctx.paths);
+    await manager.load();
+
+    // Disable the mod directly on the loaded manifest, as `Disable.run` would.
+    const spec = manager.manifestService.manifest.mods.get("modrinth:sodium")!;
+    manager.manifestService.manifest.mods.delete("modrinth:sodium");
+    manager.manifestService.manifest.mods.set("disabled:modrinth:sodium", spec);
+
+    await Install.runWithManager(manager, false, false);
+
+    expect(existsSync(join(ctx.config.modsDir, mod.filename))).toBe(false);
+    // Lock entry is still refreshed/kept for update checks
+    expect(manager.lockService.lock.mods.has("modrinth:sodium")).toBe(true);
   });
 });

@@ -1,9 +1,10 @@
 // Install operation ported from src-tauri/src/app/modules/core/install.rs
 
-import { existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, readFileSync } from "fs";
-import { join } from "path";
-import { createHash } from "crypto";
-import type { ModManager } from "./mod-manager.js";
+import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync} from "fs";
+import {join} from "path";
+import {createHash} from "crypto";
+import type {ModManager} from "./mod-manager.js";
+import {modEntryToKey} from "../models/manifest.js";
 
 export class Install {
   static async runWithManager(
@@ -12,8 +13,11 @@ export class Install {
     forceRehash: boolean,
   ): Promise<void> {
     const mods = manager.manifestModEntries();
+    const disabledKeys = new Set(
+      mods.filter((m) => m.disabled).map((m) => modEntryToKey(m)),
+    );
 
-    // 1. Refresh all manifest mods (update lock)
+    // 1. Refresh all manifest mods (update lock), disabled ones included
     for (const entry of mods) {
       await manager.refreshMod(entry, undefined, false, false);
     }
@@ -32,6 +36,7 @@ export class Install {
     // 4. Hash-verify existing mods (unless force-rehash)
     if (!forceRehash) {
       for (const [key, entry] of manager.lockService.lock.mods) {
+        if (disabledKeys.has(key)) continue;
         const fileName = `${key}-${entry.version}.jar`;
         const modPath = join(modsDir, fileName);
         const cachePath = join(cacheDir, fileName);
@@ -50,6 +55,7 @@ export class Install {
     const expectedModFiles: string[] = [];
 
     for (const [key, entry] of manager.lockService.lock.mods) {
+      if (disabledKeys.has(key)) continue;
       const fileName = `${key}-${entry.version}.jar`;
       const targetPath = join(modsDir, fileName);
       const cachePath = join(cacheDir, fileName);

@@ -1,16 +1,16 @@
 // LockService ported from src-tauri/src/app/modules/lock/services.rs
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import type { ConfigPaths } from "../models/config.js";
-import type { IO } from "../io/io.types.js";
-import type { LockFile, LockEntry } from "../models/lockfile.js";
-import type { Manifest, ModEntry, VersionSpec } from "../models/manifest.js";
-import type { VersionResult } from "../models/repository.js";
-import type { RepositoryService } from "../repositories/repository-service.js";
-import { modEntryToKey, versionSpecToString } from "../models/manifest.js";
-import { emptyLockFile } from "../models/lockfile.js";
-import { asStr } from "../helpers/utils.js";
-import { satisfies, resolveVersion, compareVersions } from "../helpers/semver.js";
+import {existsSync, readFileSync, writeFileSync} from "fs";
+import type {ConfigPaths} from "../models/config.js";
+import type {IO} from "../io/io.types.js";
+import type {LockEntry, LockFile} from "../models/lockfile.js";
+import {emptyLockFile} from "../models/lockfile.js";
+import type {Manifest, ModEntry, VersionSpec} from "../models/manifest.js";
+import {manifestKeyForEntry, modEntryToKey, modsAsEntries, versionSpecToString} from "../models/manifest.js";
+import type {VersionResult} from "../models/repository.js";
+import type {RepositoryService} from "../repositories/repository-service.js";
+import {asStr} from "../helpers/utils.js";
+import {compareVersions, resolveVersion, satisfies} from "../helpers/semver.js";
 
 export class LockService {
   lock: LockFile;
@@ -112,12 +112,13 @@ export class LockService {
       });
 
       if (upgrade) {
-        const currentSpec = manifest.mods.get(key);
+        const manifestKey = manifestKeyForEntry(manifestMod);
+        const currentSpec = manifest.mods.get(manifestKey);
         if (currentSpec) {
           const newSpec: VersionSpec = currentSpec.kind === "exact"
             ? { kind: "exact", value: resolved.version }
             : { kind: "range", value: `^${resolved.version}` };
-          manifest.mods.set(key, newSpec);
+          manifest.mods.set(manifestKey, newSpec);
         }
       }
     } else {
@@ -131,7 +132,7 @@ export class LockService {
 
   /** Remove lock entries not present in manifest. Returns set of removed keys. */
   prune(manifest: Manifest): Set<string> {
-    const manifestKeys = new Set(manifest.mods.keys());
+    const manifestKeys = new Set(modsAsEntries(manifest).map((e) => modEntryToKey(e)));
     const removed = new Set<string>();
 
     for (const key of this.lock.mods.keys()) {

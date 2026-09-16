@@ -1,5 +1,5 @@
-import type { Command } from "commander";
-import { Outdated, type ModManager } from "@mcpm/core";
+import type {Command} from "commander";
+import {type ModManager, Outdated} from "@mcpm/core";
 
 export function registerOutdated(program: Command, getManager: () => Promise<ModManager>): void {
   program
@@ -24,8 +24,15 @@ export function registerOutdated(program: Command, getManager: () => Promise<Mod
         console.log("-".repeat(103));
 
         for (const entry of result.outdated) {
+          const label = entry.disabled ? `${entry.key} (disabled)` : entry.key;
           console.log(
-            `| ${entry.key.padEnd(30)} | ${entry.current.padEnd(20)} | ${(entry.wanted ?? "-").padEnd(20)} | ${(entry.latest ?? "-").padEnd(20)} |`,
+            `| ${label.padEnd(30)} | ${entry.current.padEnd(20)} | ${(entry.wanted ?? "-").padEnd(20)} | ${(entry.latest ?? "-").padEnd(20)} |`,
+          );
+        }
+
+        for (const entry of result.outdated.filter((e) => e.disabled)) {
+          io.warn(
+            `${entry.key} is disabled but a compatible update is available: ${entry.current} -> ${entry.latest ?? entry.wanted}`,
           );
         }
 

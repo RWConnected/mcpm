@@ -1,13 +1,15 @@
-import type { Command } from "commander";
-import type { ConfigPaths, IO, ModManager, RepositoryService } from "@mcpm/core";
-import { registerInit } from "./init.js";
-import { registerAdd } from "./add.js";
-import { registerRemove } from "./remove.js";
-import { registerInstall } from "./install.js";
-import { registerUpgrade } from "./upgrade.js";
-import { registerOutdated } from "./outdated.js";
-import { registerList } from "./list.js";
-import { registerSearch } from "./search.js";
+import type {Command} from "commander";
+import type {ConfigPaths, IO, ModManager, RepositoryService} from "@mcpm/core";
+import {registerInit} from "./init.js";
+import {registerAdd} from "./add.js";
+import {registerRemove} from "./remove.js";
+import {registerDisable} from "./disable.js";
+import {registerEnable} from "./enable.js";
+import {registerInstall} from "./install.js";
+import {registerUpgrade} from "./upgrade.js";
+import {registerOutdated} from "./outdated.js";
+import {registerList} from "./list.js";
+import {registerSearch} from "./search.js";
 
 export function registerCommands(
   program: Command,
@@ -21,6 +23,8 @@ export function registerCommands(
   registerInit(program, context.getPaths, context.getIO);
   registerAdd(program, context.getManager);
   registerRemove(program, context.getManager);
+  registerDisable(program, context.getManager);
+  registerEnable(program, context.getManager);
   registerInstall(program, context.getManager);
   registerUpgrade(program, context.getManager);
   registerOutdated(program, context.getManager);

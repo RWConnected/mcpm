@@ -1,11 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
 import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory,
-  FakeRepository, FakeDownloadService,
+  FakeDownloadService,
+  FakeRepository,
+  LockfileFactory,
+  ManifestFactory,
+  ModFactory,
+  TestContext,
 } from "../testing/index.js";
-import { ModManager } from "./mod-manager.js";
-import { Outdated } from "./outdated.js";
-import { RepositoryService } from "../repositories/repository-service.js";
+import {ModManager} from "./mod-manager.js";
+import {Outdated} from "./outdated.js";
+import {RepositoryService} from "../repositories/repository-service.js";
 
 function createManager(ctx: TestContext, repo: FakeRepository): ModManager {
   const repoService = new RepositoryService();
@@ -81,5 +85,30 @@ describe("Outdated", () => {
     const result = await Outdated.run(manager, ["sodium"]);
 
     expect(result.totalChecked).toBe(1); // only checked sodium
+  });
+
+  it("still checks disabled mods and flags them in the result", async () => {
+    const v1 = ModFactory.create("modrinth:sodium", "1.0.0");
+    const v2 = ModFactory.create("modrinth:sodium", "1.1.0");
+
+    ManifestFactory.create("1.21.11").withMod(v1).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(v1).writeTo(ctx.paths);
+
+    const repo = new FakeRepository().withVersion(v1).withVersion(v2);
+    const manager = createManager(ctx, repo);
+    await manager.load();
+
+    manager.manifestService.manifest.mods.delete("modrinth:sodium");
+    manager.manifestService.manifest.mods.set(
+      "disabled:modrinth:sodium",
+      { kind: "range", value: "^1.0.0" },
+    );
+
+    const result = await Outdated.run(manager, []);
+
+    expect(result.totalChecked).toBe(1);
+    expect(result.outdated).toHaveLength(1);
+    expect(result.outdated[0].disabled).toBe(true);
+    expect(result.outdated[0].wanted).toBe("1.1.0");
   });
 });

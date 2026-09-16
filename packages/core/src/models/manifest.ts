@@ -14,6 +14,7 @@ export interface ModEntry {
   readonly slug: string;
   readonly version: VersionSpec;
   readonly provider: Provider;
+  readonly disabled?: boolean;
 }
 
 export interface Manifest {
@@ -99,10 +100,16 @@ export function mergeManifest(partial: PartialManifest): Manifest {
 
 const KNOWN_PROVIDERS = new Set<string>(["modrinth", "curseforge", "github", "maven"]);
 
+/** Prefix used on a manifest mod key to mark it as temporarily disabled. */
+export const DISABLED_PREFIX = "disabled:";
+
 /** Convert manifest mods map to ModEntry array (like Rust's Manifest::mods_as_entries) */
 export function modsAsEntries(manifest: Manifest): ModEntry[] {
   const entries: ModEntry[] = [];
-  for (const [key, version] of manifest.mods) {
+  for (const [rawKey, version] of manifest.mods) {
+    const disabled = rawKey.startsWith(DISABLED_PREFIX);
+    const key = disabled ? rawKey.slice(DISABLED_PREFIX.length) : rawKey;
+
     const colonIdx = key.indexOf(":");
     const providerStr = colonIdx >= 0 ? key.slice(0, colonIdx) : "";
     const slug = colonIdx >= 0 ? key.slice(colonIdx + 1) : key;
@@ -111,24 +118,44 @@ export function modsAsEntries(manifest: Manifest): ModEntry[] {
       ? (providerStr as Provider)
       : manifest.default_provider;
 
-    entries.push({ slug, version, provider });
+    entries.push(disabled ? { slug, version, provider, disabled } : { slug, version, provider });
   }
   return entries;
 }
 
-/** Format a ModEntry as "provider:slug" (like Rust's ModEntry::to_key) */
+/** Format a ModEntry as "provider:slug" (like Rust's ModEntry::to_key). Always canonical/unprefixed. */
 export function modEntryToKey(entry: ModEntry): string {
   return `${entry.provider}:${entry.slug}`;
 }
 
+/** Format a ModEntry as the key that should be stored in Manifest.mods, including the disabled prefix. */
+export function manifestKeyForEntry(entry: ModEntry): string {
+  const key = modEntryToKey(entry);
+  return entry.disabled ? `${DISABLED_PREFIX}${key}` : key;
+}
+
 /** Insert a mod entry into the manifest (like Rust's Manifest::insert_mod_entry) */
 export function insertModEntry(manifest: Manifest, entry: ModEntry): void {
-  const key = modEntryToKey(entry);
+  const key = manifestKeyForEntry(entry);
   manifest.mods.set(key, entry.version);
+}
+
+/** Disable a mod entry in place (moves it under the disabled prefix). No-op if already disabled or missing. */
+export function disableModEntry(manifest: Manifest, entry: ModEntry): boolean {
+  if (entry.disabled) return false;
+  const key = modEntryToKey(entry);
+  const version = manifest.mods.get(key);
+  if (version === undefined) return false;
+  manifest.mods.delete(key);
+  manifest.mods.set(`${DISABLED_PREFIX}${key}`, version);
+  return true;
 }
 
 /** Remove a mod by provider and slug, returns true if removed (like Rust's Manifest::remove_mod_entry) */
 export function removeModEntry(manifest: Manifest, provider: string, slug: string): boolean {
   const key = `${provider}:${slug}`;
-  return manifest.mods.delete(key);
+  const disabledKey = `${DISABLED_PREFIX}${key}`;
+  const removed = manifest.mods.delete(key);
+  const removedDisabled = manifest.mods.delete(disabledKey);
+  return removed || removedDisabled;
 }

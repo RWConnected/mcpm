@@ -46,6 +46,8 @@ export type { OutdatedResult, OutdatedEntry } from "./operations/outdated.js";
 export { Add } from "./operations/add.js";
 export type { AddOptions } from "./operations/add.js";
 export { Remove } from "./operations/remove.js";
+export { Disable } from "./operations/disable.js";
+export { Enable } from "./operations/enable.js";
 export { List } from "./operations/list.js";
 export { Init } from "./operations/init.js";
 export { Search } from "./operations/search.js";

@@ -1,14 +1,15 @@
-import type { ModManager } from "./mod-manager.js";
-import type { ModEntry } from "../models/manifest.js";
-import { modEntryToKey } from "../models/manifest.js";
-import { asStr } from "../helpers/utils.js";
-import { resolveVersion } from "../helpers/semver.js";
+import type {ModManager} from "./mod-manager.js";
+import type {ModEntry} from "../models/manifest.js";
+import {modEntryToKey} from "../models/manifest.js";
+import {asStr} from "../helpers/utils.js";
+import {resolveVersion} from "../helpers/semver.js";
 
 export interface OutdatedEntry {
   key: string;
   current: string;
   wanted?: string;
   latest?: string;
+  disabled?: boolean;
 }
 
 export interface OutdatedResult {
@@ -70,7 +71,7 @@ export class Outdated {
 
     const current = lockEntry.version;
     if ((wanted && wanted !== current) || (latest && latest !== current)) {
-      return { key, current, wanted, latest };
+      return { key, current, wanted, latest, disabled: m.disabled };
     }
     return undefined;
   }

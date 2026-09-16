@@ -1,11 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
 import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory,
-  FakeRepository, FakeDownloadService,
+  FakeDownloadService,
+  FakeRepository,
+  LockfileFactory,
+  ManifestFactory,
+  ModFactory,
+  TestContext,
 } from "../testing/index.js";
-import { ModManager } from "./mod-manager.js";
-import { Upgrade } from "./upgrade.js";
-import { RepositoryService } from "../repositories/repository-service.js";
+import {ModManager} from "./mod-manager.js";
+import {Upgrade} from "./upgrade.js";
+import {RepositoryService} from "../repositories/repository-service.js";
 
 function createManager(ctx: TestContext, repo: FakeRepository, dl: FakeDownloadService): ModManager {
   const repoService = new RepositoryService();
@@ -65,5 +69,41 @@ describe("Upgrade", () => {
     const [, before, after] = result.upgraded[0];
     expect(before).toBe(initial.version);
     expect(after).toBe(desired.version);
+  });
+
+  it("throws when a mod has no compatible version and disableUnresolved is off", async () => {
+    const modId = "modrinth:rwc-gui-shop";
+    const initial = ModFactory.create(modId, "2.0.0+1.21.5").forMcVersions(["1.21.5"]);
+
+    const repo = new FakeRepository().withVersion(initial);
+    const dl = new FakeDownloadService().withMod(initial);
+    const manager = createManager(ctx, repo, dl);
+
+    // Manifest targets a Minecraft version the only known release doesn't support
+    ManifestFactory.create("1.22.0").withMod(initial).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(initial).writeTo(ctx.paths);
+    await manager.load();
+
+    await expect(Upgrade.runWithManager(manager, [], false)).rejects.toThrow("Failed to update");
+  });
+
+  it("disables an unresolvable mod instead of failing when disableUnresolved is set", async () => {
+    const modId = "modrinth:rwc-gui-shop";
+    const initial = ModFactory.create(modId, "2.0.0+1.21.5").forMcVersions(["1.21.5"]);
+
+    const repo = new FakeRepository().withVersion(initial);
+    const dl = new FakeDownloadService().withMod(initial);
+    const manager = createManager(ctx, repo, dl);
+
+    ManifestFactory.create("1.22.0").withMod(initial).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(initial).writeTo(ctx.paths);
+    await manager.load();
+
+    const result = await Upgrade.runWithManager(manager, [], false, true);
+
+    expect(result.disabled).toEqual([modId]);
+    expect(result.upgraded).toHaveLength(0);
+    expect(manager.manifestService.manifest.mods.has(`disabled:${modId}`)).toBe(true);
+    expect(manager.manifestService.manifest.mods.has(modId)).toBe(false);
   });
 });

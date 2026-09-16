@@ -15,9 +15,12 @@ It is CLI-first but I'm planning a future release with an optional **Tauri + Vue
 - **Mod management** via Modrinth API  
   - `mcpm add` — add a mod to your manifest  
   - `mcpm remove` — remove a mod  
-  - `mcpm install` — install or update all mods  
+  - `mcpm disable` — temporarily disable a mod (kept in the manifest, skipped on install)  
+  - `mcpm enable` — re-enable a previously disabled mod  
+  - `mcpm install` — install or update all mods (skips disabled mods)  
   - `mcpm upgrade` — upgrade mods to newer compatible versions  
-  - `mcpm outdated` — check which mods are outdated  
+    - `--disable-unresolved` — disable a mod instead of failing the upgrade when no compatible version exists for the target Minecraft version  
+  - `mcpm outdated` — check which mods are outdated (still checks disabled mods, and flags them if an update is available)  
   - `mcpm search` — find mods interactively
 - **Lockfile system** (`mcpm.lock`) for reproducible installs
 - **Semantic versioning** support (`^1.2`, `>=1.20`, etc.)
@@ -33,7 +36,6 @@ It is CLI-first but I'm planning a future release with an optional **Tauri + Vue
     - Author - Author's name or username
     - Description - Short description from mod page. Can be overrided by the user and can be used for notes about the mod.
     - Accepted Minecraft versions - Override the accepted Minecraft version when searching for a mod version
-    - Disabled - Disable mod from being installed (useful when a mod yet has to be updated to the newest Minecraft version)
   - Resource pack management  
   - Datapack management  
   - Shader and texture pack support  
