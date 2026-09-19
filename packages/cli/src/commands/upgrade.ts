@@ -13,6 +13,10 @@ export function registerUpgrade(program: Command, getManager: () => Promise<ModM
       "--disable-unresolved",
       "Disable mods that have no compatible version for the target Minecraft version instead of failing",
     )
+    .option(
+      "--enable-resolved",
+      "Re-enable disabled mods that now have a compatible version for the target Minecraft version",
+    )
     .action(async (mods: string[], opts) => {
       const manager = await getManager();
       const io = manager.io;
@@ -22,6 +26,7 @@ export function registerUpgrade(program: Command, getManager: () => Promise<ModM
           mods,
           opts.ignoreConstraints === true,
           opts.disableUnresolved === true,
+          opts.enableResolved === true,
         );
 
         for (const key of result.disabled) {
@@ -30,7 +35,22 @@ export function registerUpgrade(program: Command, getManager: () => Promise<ModM
           );
         }
 
-        if (result.upgraded.length === 0 && result.disabled.length === 0) {
+        for (const key of result.enabled) {
+          io.success(`Enabled ${key}: a compatible version was found`);
+        }
+
+        for (const key of result.stillUnresolved) {
+          io.info(
+            `${key} is disabled and still has no compatible version for Minecraft ${manager.manifestService.manifest.minecraft_version}`,
+          );
+        }
+
+        if (
+          result.upgraded.length === 0 &&
+          result.disabled.length === 0 &&
+          result.stillUnresolved.length === 0 &&
+          result.enabled.length === 0
+        ) {
           io.info("All selected mods are already up to date");
           return;
         }

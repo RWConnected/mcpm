@@ -1,12 +1,14 @@
 // Upgrade operation ported from src-tauri/src/app/modules/core/upgrade.rs
 
 import type {ModManager} from "./mod-manager.js";
-import {disableModEntry, modEntryToKey} from "../models/manifest.js";
+import {disableModEntry, enableModEntry, modEntryToKey} from "../models/manifest.js";
 
 export interface UpgradeResult {
   upgraded: Array<[string, string | undefined, string | undefined]>; // [key, before, after]
   unchanged: number;
   disabled: string[]; // keys disabled because no compatible version was found
+  stillUnresolved: string[]; // already-disabled keys that still have no compatible version
+  enabled: string[]; // previously-disabled keys re-enabled because a compatible version was found
 }
 
 export class Upgrade {
@@ -15,6 +17,7 @@ export class Upgrade {
     mods: string[],
     ignoreConstraints: boolean,
     disableUnresolved = false,
+    enableResolved = false,
   ): Promise<UpgradeResult> {
     const allMods = manager.manifestModEntries();
 
@@ -36,6 +39,8 @@ export class Upgrade {
 
     // Refresh each mod with upgrade=true
     const disabled: string[] = [];
+    const stillUnresolved: string[] = [];
+    const enabled: string[] = [];
     for (const entry of toUpgrade) {
       const success = await manager.lockService.updateEntry(
         entry,
@@ -47,11 +52,24 @@ export class Upgrade {
       );
 
       if (!success) {
+        // Already-disabled mods are expected to sometimes be unresolvable (that's often
+        // *why* they were disabled) — still tried, but never fails the whole upgrade.
+        if (entry.disabled) {
+          stillUnresolved.push(modEntryToKey(entry));
+          continue;
+        }
         if (!disableUnresolved) {
           throw new Error(`Failed to update ${entry.slug}`);
         }
         if (disableModEntry(manager.manifestService.manifest, entry)) {
           disabled.push(modEntryToKey(entry));
+        }
+        continue;
+      }
+
+      if (entry.disabled && enableResolved) {
+        if (enableModEntry(manager.manifestService.manifest, entry)) {
+          enabled.push(modEntryToKey(entry));
         }
       }
     }
@@ -60,12 +78,12 @@ export class Upgrade {
 
     // Compare snapshots
     const upgraded: Array<[string, string | undefined, string | undefined]> = [];
-    const disabledKeys = new Set(disabled);
+    const skipKeys = new Set([...disabled, ...stillUnresolved]);
     let unchanged = 0;
 
     for (const entry of toUpgrade) {
       const key = modEntryToKey(entry);
-      if (disabledKeys.has(key)) continue;
+      if (skipKeys.has(key)) continue;
 
       const before = beforeVersions.get(key);
       const after = manager.lockService.getVersion(entry);
@@ -77,6 +95,6 @@ export class Upgrade {
       }
     }
 
-    return { upgraded, unchanged, disabled };
+    return { upgraded, unchanged, disabled, stillUnresolved, enabled };
   }
 }

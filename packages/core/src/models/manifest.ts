@@ -151,6 +151,18 @@ export function disableModEntry(manifest: Manifest, entry: ModEntry): boolean {
   return true;
 }
 
+/** Enable a mod entry in place (moves it out of the disabled prefix). No-op if already enabled or missing. */
+export function enableModEntry(manifest: Manifest, entry: ModEntry): boolean {
+  if (!entry.disabled) return false;
+  const key = modEntryToKey(entry);
+  const disabledKey = `${DISABLED_PREFIX}${key}`;
+  const version = manifest.mods.get(disabledKey);
+  if (version === undefined) return false;
+  manifest.mods.delete(disabledKey);
+  manifest.mods.set(key, version);
+  return true;
+}
+
 /** Remove a mod by provider and slug, returns true if removed (like Rust's Manifest::remove_mod_entry) */
 export function removeModEntry(manifest: Manifest, provider: string, slug: string): boolean {
   const key = `${provider}:${slug}`;

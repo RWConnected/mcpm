@@ -85,7 +85,12 @@ export class LockService {
         );
 
     if (versions.length === 0) {
-      this.io.error(`No compatible versions found for '${manifestMod.slug}'`);
+      const message = `No compatible versions found for '${manifestMod.slug}'`;
+      if (manifestMod.disabled) {
+        this.io.info(message);
+      } else {
+        this.io.error(message);
+      }
       return false;
     }
 

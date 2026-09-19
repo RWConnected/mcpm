@@ -106,4 +106,75 @@ describe("Upgrade", () => {
     expect(manager.manifestService.manifest.mods.has(`disabled:${modId}`)).toBe(true);
     expect(manager.manifestService.manifest.mods.has(modId)).toBe(false);
   });
+
+  it("does not throw when an already-disabled mod has no compatible version", async () => {
+    const modId = "modrinth:rwc-gui-shop";
+    const initial = ModFactory.create(modId, "2.0.0+1.21.5").forMcVersions(["1.21.5"]);
+
+    const repo = new FakeRepository().withVersion(initial);
+    const dl = new FakeDownloadService().withMod(initial);
+    const manager = createManager(ctx, repo, dl);
+
+    ManifestFactory.create("1.22.0").withMod(initial).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(initial).writeTo(ctx.paths);
+    await manager.load();
+
+    // Mark it disabled directly, as `Disable.run` would.
+    manager.manifestService.manifest.mods.delete(modId);
+    manager.manifestService.manifest.mods.set(`disabled:${modId}`, { kind: "exact", value: initial.version });
+
+    const result = await Upgrade.runWithManager(manager, [], false);
+
+    expect(result.stillUnresolved).toEqual([modId]);
+    expect(result.disabled).toHaveLength(0);
+    expect(result.upgraded).toHaveLength(0);
+    // Still disabled, not touched
+    expect(manager.manifestService.manifest.mods.has(`disabled:${modId}`)).toBe(true);
+  });
+
+  it("keeps a disabled mod disabled when it resolves and enableResolved is off", async () => {
+    const modId = "modrinth:rwc-gui-shop";
+    const initial = ModFactory.create(modId, "2.0.0+1.21.5").forMcVersions(["1.21.5"]);
+    const compatible = ModFactory.create(modId, "2.0.1+1.21.11").forMcVersions(["1.21.11"]);
+
+    const repo = new FakeRepository().withVersion(initial).withVersion(compatible);
+    const dl = new FakeDownloadService().withMod(initial).withMod(compatible);
+    const manager = createManager(ctx, repo, dl);
+
+    ManifestFactory.create("1.21.11").withMod(initial).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(initial).writeTo(ctx.paths);
+    await manager.load();
+
+    manager.manifestService.manifest.mods.delete(modId);
+    manager.manifestService.manifest.mods.set(`disabled:${modId}`, { kind: "range", value: "^2.0.0" });
+
+    const result = await Upgrade.runWithManager(manager, [], false);
+
+    expect(result.enabled).toHaveLength(0);
+    expect(manager.manifestService.manifest.mods.has(`disabled:${modId}`)).toBe(true);
+    expect(manager.manifestService.manifest.mods.has(modId)).toBe(false);
+  });
+
+  it("re-enables a disabled mod once a compatible version resolves and enableResolved is set", async () => {
+    const modId = "modrinth:rwc-gui-shop";
+    const initial = ModFactory.create(modId, "2.0.0+1.21.5").forMcVersions(["1.21.5"]);
+    const compatible = ModFactory.create(modId, "2.0.1+1.21.11").forMcVersions(["1.21.11"]);
+
+    const repo = new FakeRepository().withVersion(initial).withVersion(compatible);
+    const dl = new FakeDownloadService().withMod(initial).withMod(compatible);
+    const manager = createManager(ctx, repo, dl);
+
+    ManifestFactory.create("1.21.11").withMod(initial).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(initial).writeTo(ctx.paths);
+    await manager.load();
+
+    manager.manifestService.manifest.mods.delete(modId);
+    manager.manifestService.manifest.mods.set(`disabled:${modId}`, { kind: "range", value: "^2.0.0" });
+
+    const result = await Upgrade.runWithManager(manager, [], false, false, true);
+
+    expect(result.enabled).toEqual([modId]);
+    expect(manager.manifestService.manifest.mods.has(`disabled:${modId}`)).toBe(false);
+    expect(manager.manifestService.manifest.mods.has(modId)).toBe(true);
+  });
 });
