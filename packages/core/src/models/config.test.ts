@@ -12,6 +12,8 @@ describe("resolveConfig", () => {
       "MCPM_OUTPUT_DIR",
       "MCPM_MODS_DIR",
       "MCPM_DATAPACKS_DIR",
+      "MCPM_RESOURCEPACKS_DIR",
+      "MCPM_SHADERPACKS_DIR",
       "MCPM_MODRINTH_TOKEN",
     ]) {
       savedEnv[key] = process.env[key];
@@ -100,6 +102,18 @@ describe("resolveConfig", () => {
     process.env.MCPM_DATAPACKS_DIR = "/env/datapacks";
     const config = resolveConfig({});
     expect(config.datapacksDir).toBe("/env/datapacks");
+  });
+
+  it("resolves resourcepacks/shaderpacks dirs relative to output dir by default", () => {
+    const config = resolveConfig({ projectDir: "/my/project", outputDir: "/my/output" });
+    expect(config.resourcepacksDir).toBe("/my/output/resourcepacks");
+    expect(config.shaderpacksDir).toBe("/my/output/shaderpacks");
+  });
+
+  it("resolves resourcepacks/shaderpacks dirs from CLI options and env vars", () => {
+    expect(resolveConfig({ resourcepacksDir: "/custom/rp" }).resourcepacksDir).toBe("/custom/rp");
+    process.env.MCPM_SHADERPACKS_DIR = "/env/shaders";
+    expect(resolveConfig({}).shaderpacksDir).toBe("/env/shaders");
   });
 
   it("config is frozen (immutable)", () => {

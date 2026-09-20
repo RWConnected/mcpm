@@ -22,31 +22,34 @@ It is CLI-first but I'm planning a future release with an optional **Tauri + Vue
     - `--disable-unresolved` — disable a mod instead of failing the upgrade when no compatible version exists for the target Minecraft version  
   - `mcpm outdated` — check which mods are outdated (still checks disabled mods, and flags them if an update is available)  
   - `mcpm search` — find mods interactively
+- **Datapack management** (beta) — same `add`/`remove`/`disable`/`enable`/`install`/`upgrade`/`outdated` workflow as mods, own list in the manifest and own install folder
+- **Resourcepack management** (beta) — same workflow as mods/datapacks, own list and install folder
+- **Shaderpack management** (beta) — same workflow as mods/datapacks, own list and install folder
 - **Lockfile system** (`mcpm.lock`) for reproducible installs
 - **Semantic versioning** support (`^1.2`, `>=1.20`, etc.)
 - **Offline caching** of downloaded mods
 - Multiple providers
-  - Modrinth
-  - Maven (beta)
-  - Github releases (beta)
-  - Gitlab releases (beta)
-  - Url (beta)
-  - Local filesystem (beta)
+  - Modrinth — default provider; search, discovery and version resolution via the Modrinth API
+  - Maven (beta) — resolve versions from a Maven repository coordinate
+  - Github releases (beta) — resolve versions from a GitHub repo's release assets
+  - Gitlab releases (beta) — resolve versions from a GitLab repo's release assets
+  - Url (beta) — fetch a specific version from a URL template (`{slug}`/`{version}` placeholders)
+  - Local filesystem (beta) — resolve versions from files in a local directory
+  - VanillaTweaks (beta) — datapacks, crafting tweaks and resourcepacks built from your own pack selection
 - **Cross-platform** (Windows, macOS, Linux)
 - **Planned:**  
-  - More sources like Curseforge, Github, Gitlab
+  - More sources like Curseforge
   - Restructure mod entry into an object:
     - Slug (as object key) - Human friendly identifier or an ID if slug not available
     - Version - supports semantic versioning and range matching
     - Providers - List of sources to search for updates for this mod
     - Name - User friendly name
     - Author - Author's name or username
-    - Description - Short description from mod page. Can be overrided by the user and can be used for notes about the mod.
+    - Description - Short description from mod page. Can be overridden by the user and can be used for notes about the mod.
+    - Notes - An array of strings that can be used to add notes about the mod (e.g. to keep track of bugs or incompatibilities)
+    - Disabled - Optional boolean to enable/disable the mod
     - Accepted Minecraft versions - Override the accepted Minecraft version when searching for a mod version
-  - Resource pack management  
-  - Datapack management  
-  - Shader and texture pack support  
-  - Graphical interface via Tauri (Vue.js frontend)
+  - Graphical interface via Tauri (Vue.js frontend) (under considiration)
   - Test suite (eventually… I promise)
 
 ---

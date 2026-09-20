@@ -9,7 +9,7 @@ export type ModLoader = "forge" | "fabric" | "quilt" | "neoforge";
 export type Provider = string;
 
 /** Which manifest/lock list an entry belongs to. */
-export type ResourceKind = "mod" | "datapack";
+export type ResourceKind = "mod" | "datapack" | "resourcepack" | "shaderpack";
 
 export type VersionSpec =
   | { readonly kind: "exact"; readonly value: string }
@@ -33,6 +33,8 @@ export interface Manifest {
   default_provider: Provider;
   mods: Map<string, VersionSpec>;
   datapacks: Map<string, VersionSpec>;
+  resourcepacks: Map<string, VersionSpec>;
+  shaderpacks: Map<string, VersionSpec>;
   license?: string;
   homepage?: string;
   tags?: string[];
@@ -50,6 +52,8 @@ export interface PartialManifest {
   default_provider?: Provider;
   mods?: Map<string, VersionSpec>;
   datapacks?: Map<string, VersionSpec>;
+  resourcepacks?: Map<string, VersionSpec>;
+  shaderpacks?: Map<string, VersionSpec>;
   license?: string;
   homepage?: string;
   tags?: string[];
@@ -86,6 +90,8 @@ export function defaultManifest(): Manifest {
     default_provider: "modrinth",
     mods: new Map(),
     datapacks: new Map(),
+    resourcepacks: new Map(),
+    shaderpacks: new Map(),
   };
 }
 
@@ -103,6 +109,8 @@ export function mergeManifest(partial: PartialManifest): Manifest {
     default_provider: partial.default_provider ?? defaults.default_provider,
     mods: partial.mods ?? new Map(),
     datapacks: partial.datapacks ?? new Map(),
+    resourcepacks: partial.resourcepacks ?? new Map(),
+    shaderpacks: partial.shaderpacks ?? new Map(),
     license: partial.license ?? defaults.license,
     homepage: partial.homepage ?? defaults.homepage,
     tags: partial.tags ?? defaults.tags,
@@ -123,9 +131,25 @@ export function knownProviderIds(manifest: Manifest): Set<string> {
   return ids;
 }
 
-/** Returns the manifest map for the given resource kind ("mod" -> mods, "datapack" -> datapacks). */
+/** Returns the manifest map for the given resource kind. */
 export function resourceMap(manifest: Manifest, kind: ResourceKind = "mod"): Map<string, VersionSpec> {
-  return kind === "datapack" ? manifest.datapacks : manifest.mods;
+  switch (kind) {
+    case "datapack": return manifest.datapacks;
+    case "resourcepack": return manifest.resourcepacks;
+    case "shaderpack": return manifest.shaderpacks;
+    default: return manifest.mods;
+  }
+}
+
+/** Pseudo-loader value repositories use to tell resource kinds apart (mods use the manifest's
+ * real modloader). Not a real Modrinth loader taxonomy — an mcpm-internal convention. */
+export function loadersForKind(manifest: Manifest, kind: ResourceKind = "mod"): string[] {
+  switch (kind) {
+    case "datapack": return ["datapack"];
+    case "resourcepack": return ["resourcepack"];
+    case "shaderpack": return ["shaderpack"];
+    default: return [manifest.modloader];
+  }
 }
 
 /** Convert a manifest resource map to a ModEntry array (like Rust's Manifest::mods_as_entries) */

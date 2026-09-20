@@ -241,3 +241,39 @@ describe("datapacks (kind = \"datapack\")", () => {
     expect(m.mods.has("modrinth:sodium")).toBe(true);
   });
 });
+
+describe("resourcepacks and shaderpacks (smoke — same wiring as datapacks)", () => {
+  it("defaultManifest starts with empty resourcepacks/shaderpacks maps", () => {
+    const m = defaultManifest();
+    expect(m.resourcepacks.size).toBe(0);
+    expect(m.shaderpacks.size).toBe(0);
+  });
+
+  it("insertModEntry/modsAsEntries/removeModEntry route to resourcepacks for kind=resourcepack", () => {
+    const m = defaultManifest();
+    const entry: ModEntry = {
+      slug: "faithful",
+      version: { kind: "exact", value: "1.0.0" },
+      provider: "modrinth",
+    };
+    insertModEntry(m, entry, "resourcepack");
+    expect(m.resourcepacks.has("modrinth:faithful")).toBe(true);
+    expect(modsAsEntries(m, "resourcepack")[0]?.slug).toBe("faithful");
+    expect(removeModEntry(m, "modrinth", "faithful", "resourcepack")).toBe(true);
+    expect(m.resourcepacks.has("modrinth:faithful")).toBe(false);
+  });
+
+  it("insertModEntry/modsAsEntries/removeModEntry route to shaderpacks for kind=shaderpack", () => {
+    const m = defaultManifest();
+    const entry: ModEntry = {
+      slug: "complementary",
+      version: { kind: "exact", value: "1.0.0" },
+      provider: "modrinth",
+    };
+    insertModEntry(m, entry, "shaderpack");
+    expect(m.shaderpacks.has("modrinth:complementary")).toBe(true);
+    expect(modsAsEntries(m, "shaderpack")[0]?.slug).toBe("complementary");
+    expect(removeModEntry(m, "modrinth", "complementary", "shaderpack")).toBe(true);
+    expect(m.shaderpacks.has("modrinth:complementary")).toBe(false);
+  });
+});

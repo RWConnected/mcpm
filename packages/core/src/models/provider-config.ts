@@ -62,6 +62,10 @@ export interface VanillaTweaksProviderConfig {
   /** Bundle name -> category->packs selection, POSTed as "ctcategories". Datapacks under the hood,
    * kept separate only because VanillaTweaks' zip endpoint needs the right wrapper key per type. */
   readonly craftingtweaks?: Record<string, VanillaTweaksSelection>;
+  /** Bundle name -> category->packs selection, POSTed as "rpcategories". A genuinely different
+   * ResourceKind ("resourcepack") from datapacks/craftingtweaks, so its bundle names only need
+   * to be unique within this map, not against datapacks/craftingtweaks. */
+  readonly resourcepacks?: Record<string, VanillaTweaksSelection>;
 }
 
 export type ProviderConfig =
@@ -121,9 +125,11 @@ function validateOne(config: ProviderConfig): string | undefined {
     case "vanillatweaks": {
       const datapackNames = Object.keys(config.datapacks ?? {});
       const craftingtweakNames = Object.keys(config.craftingtweaks ?? {});
-      if (datapackNames.length === 0 && craftingtweakNames.length === 0) {
-        return "missing datapacks or craftingtweaks bundles";
+      const resourcepackNames = Object.keys(config.resourcepacks ?? {});
+      if (datapackNames.length === 0 && craftingtweakNames.length === 0 && resourcepackNames.length === 0) {
+        return "missing datapacks, craftingtweaks or resourcepacks bundles";
       }
+      // resourcepacks are a different ResourceKind/lookup path — only datapacks vs craftingtweaks collide.
       const collisions = datapackNames.filter((name) => craftingtweakNames.includes(name));
       if (collisions.length > 0) {
         return `bundle name(s) ${collisions.join(", ")} defined in both datapacks and craftingtweaks`;

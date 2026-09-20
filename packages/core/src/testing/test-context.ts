@@ -18,9 +18,13 @@ export class TestContext {
     const cacheDir = join(this.root, "cache");
     const modsDir = join(this.root, "mods");
     const datapacksDir = join(this.root, "datapacks");
+    const resourcepacksDir = join(this.root, "resourcepacks");
+    const shaderpacksDir = join(this.root, "shaderpacks");
     mkdirSync(cacheDir, { recursive: true });
     mkdirSync(modsDir, { recursive: true });
     mkdirSync(datapacksDir, { recursive: true });
+    mkdirSync(resourcepacksDir, { recursive: true });
+    mkdirSync(shaderpacksDir, { recursive: true });
 
     this.config = Object.freeze({
       verbose: false,
@@ -30,6 +34,8 @@ export class TestContext {
       outputDir: this.root,
       modsDir,
       datapacksDir,
+      resourcepacksDir,
+      shaderpacksDir,
       modrinthToken: undefined,
     });
 

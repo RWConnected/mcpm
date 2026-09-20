@@ -158,4 +158,26 @@ describe("Install", () => {
     expect(manager.lockService.lock.datapacks.has("modrinth:vanilla-tweaks")).toBe(false);
     expect(existsSync(join(ctx.config.datapacksDir, datapack.filename))).toBe(false);
   });
+
+  it("installs resourcepacks and shaderpacks into their own dirs, independent of mods/datapacks", async () => {
+    const mcVersion = "1.21.11";
+    const resourcepack = ModFactory.create("modrinth:faithful", "1.0.0", "resourcepack");
+    const shaderpack = ModFactory.create("modrinth:complementary", "1.0.0", "shaderpack");
+
+    const repo = new FakeRepository().withVersion(resourcepack).withVersion(shaderpack);
+    const dl = new FakeDownloadService().withMod(resourcepack).withMod(shaderpack);
+    const manager = createManager(ctx, repo, dl);
+
+    LockfileFactory.create().withResourcepack(resourcepack).withShaderpack(shaderpack).writeTo(ctx.paths);
+    ManifestFactory.create(mcVersion).withResourcepack(resourcepack).withShaderpack(shaderpack).writeTo(ctx.paths);
+    await manager.load();
+
+    await Install.runWithManager(manager, false, false);
+
+    expect(existsSync(join(ctx.config.resourcepacksDir, resourcepack.filename))).toBe(true);
+    expect(existsSync(join(ctx.config.shaderpacksDir, shaderpack.filename))).toBe(true);
+    expect(existsSync(join(ctx.config.resourcepacksDir, shaderpack.filename))).toBe(false);
+    expect(existsSync(join(ctx.config.shaderpacksDir, resourcepack.filename))).toBe(false);
+    expect(existsSync(join(ctx.config.modsDir, resourcepack.filename))).toBe(false);
+  });
 });

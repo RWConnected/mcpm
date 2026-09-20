@@ -19,7 +19,7 @@ export class Upgrade {
     disableUnresolved = false,
     enableResolved = false,
   ): Promise<UpgradeResult> {
-    const allEntries = (["mod", "datapack"] as const).flatMap((kind) =>
+    const allEntries = (["mod", "datapack", "resourcepack", "shaderpack"] as const).flatMap((kind) =>
       manager.manifestEntries(kind).map((entry) => ({ entry, kind })),
     );
 

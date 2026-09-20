@@ -3,13 +3,14 @@ import type {IRepository} from "../repository.interface.js";
 import type {ModResult, VersionResult} from "../../models/repository.js";
 import type {VanillaTweaksProviderConfig, VanillaTweaksSelection} from "../../models/provider-config.js";
 
-type BundleType = "datapacks" | "craftingtweaks";
+type BundleType = "datapacks" | "craftingtweaks" | "resourcepacks";
 
 /** Endpoint + request-body wrapper key VanillaTweaks' own site uses per bundle type.
  * Isolated here so a future change to their zip-builder API is a one-place fix. */
 const ENDPOINTS: Record<BundleType, { url: string; wrapperKey: string }> = {
   datapacks: { url: "https://vanillatweaks.net/assets/server/zipdatapacks.php", wrapperKey: "dpcategories" },
   craftingtweaks: { url: "https://vanillatweaks.net/assets/server/zipcraftingtweaks.php", wrapperKey: "ctcategories" },
+  resourcepacks: { url: "https://vanillatweaks.net/assets/server/zipresourcepacks.php", wrapperKey: "rpcategories" },
 };
 
 /** Builds the request body VanillaTweaks' zip-builder endpoint expects for a given bundle type. */
@@ -43,12 +44,12 @@ export class VanillaTweaksRepository implements IRepository {
   async getVersions(
     slug: string,
     gameVersions: string[],
-    _loaders: string[],
+    loaders: string[],
     wantedVersion?: string,
   ): Promise<VersionResult[]> {
     if (!wantedVersion) return [];
 
-    const found = this.findBundle(slug);
+    const found = this.findBundle(slug, loaders);
     if (!found) return [];
 
     try {
@@ -76,7 +77,17 @@ export class VanillaTweaksRepository implements IRepository {
     }
   }
 
-  private findBundle(slug: string): { type: BundleType; selection: VanillaTweaksSelection } | undefined {
+  /** Which bundle map to search is driven by the caller's ResourceKind, carried through the
+   * pseudo-loader convention (see manifest.ts's loadersForKind): "resourcepack" -> resourcepacks
+   * only, anything else -> datapacks then craftingtweaks (both reached via loaders=["datapack"]). */
+  private findBundle(
+    slug: string,
+    loaders: string[],
+  ): { type: BundleType; selection: VanillaTweaksSelection } | undefined {
+    if (loaders.includes("resourcepack")) {
+      const resourcepack = this.cfg.resourcepacks?.[slug];
+      return resourcepack ? { type: "resourcepacks", selection: resourcepack } : undefined;
+    }
     const datapack = this.cfg.datapacks?.[slug];
     if (datapack) return { type: "datapacks", selection: datapack };
     const craftingtweak = this.cfg.craftingtweaks?.[slug];

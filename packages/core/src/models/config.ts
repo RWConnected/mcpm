@@ -12,6 +12,8 @@ export interface Config {
   readonly outputDir: string;
   readonly modsDir: string;
   readonly datapacksDir: string;
+  readonly resourcepacksDir: string;
+  readonly shaderpacksDir: string;
   readonly modrinthToken?: string;
 }
 
@@ -29,6 +31,8 @@ export interface ConfigOptions {
   outputDir?: string;
   modsDir?: string;
   datapacksDir?: string;
+  resourcepacksDir?: string;
+  shaderpacksDir?: string;
   modrinthToken?: string;
 }
 
@@ -38,6 +42,12 @@ export function resolveConfig(options: ConfigOptions = {}): Config {
   const outputDir = resolveRelativeTo(options.outputDir, "MCPM_OUTPUT_DIR", projectDir);
   const modsDir = resolveRelativeTo(options.modsDir, "MCPM_MODS_DIR", outputDir, "mods");
   const datapacksDir = resolveRelativeTo(options.datapacksDir, "MCPM_DATAPACKS_DIR", outputDir, "datapacks");
+  const resourcepacksDir = resolveRelativeTo(
+    options.resourcepacksDir, "MCPM_RESOURCEPACKS_DIR", outputDir, "resourcepacks",
+  );
+  const shaderpacksDir = resolveRelativeTo(
+    options.shaderpacksDir, "MCPM_SHADERPACKS_DIR", outputDir, "shaderpacks",
+  );
   const cacheDir = resolveCacheDir(options.cacheDir);
 
   return Object.freeze({
@@ -48,6 +58,8 @@ export function resolveConfig(options: ConfigOptions = {}): Config {
     outputDir,
     modsDir,
     datapacksDir,
+    resourcepacksDir,
+    shaderpacksDir,
     modrinthToken: resolveOptionalParam(options.modrinthToken, "MCPM_MODRINTH_TOKEN"),
   });
 }

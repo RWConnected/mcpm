@@ -30,6 +30,8 @@ const program = new Command()
   .option("--output-dir <path>", "Output directory (env: MCPM_OUTPUT_DIR)")
   .option("--mods-dir <path>", "Mods directory (env: MCPM_MODS_DIR)")
   .option("--datapacks-dir <path>", "Datapacks directory (env: MCPM_DATAPACKS_DIR)")
+  .option("--resourcepacks-dir <path>", "Resourcepacks directory (env: MCPM_RESOURCEPACKS_DIR)")
+  .option("--shaderpacks-dir <path>", "Shaderpacks directory (env: MCPM_SHADERPACKS_DIR)")
   .option("--modrinth-token <token>", "Modrinth API token (env: MCPM_MODRINTH_TOKEN)");
 
 // Lazily-initialized state
@@ -50,6 +52,8 @@ function ensureConfig(): { config: Config; paths: ConfigPaths; io: IO } {
     outputDir: opts.outputDir,
     modsDir: opts.modsDir,
     datapacksDir: opts.datapacksDir,
+    resourcepacksDir: opts.resourcepacksDir,
+    shaderpacksDir: opts.shaderpacksDir,
     modrinthToken: opts.modrinthToken,
   });
   _paths = configPaths(_config);
@@ -61,6 +65,8 @@ function ensureConfig(): { config: Config; paths: ConfigPaths; io: IO } {
   mkdirSync(_config.outputDir, { recursive: true });
   mkdirSync(_config.modsDir, { recursive: true });
   mkdirSync(_config.datapacksDir, { recursive: true });
+  mkdirSync(_config.resourcepacksDir, { recursive: true });
+  mkdirSync(_config.shaderpacksDir, { recursive: true });
 
   return { config: _config, paths: _paths, io: _io };
 }

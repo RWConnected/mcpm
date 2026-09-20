@@ -13,20 +13,20 @@ export function registerOutdated(program: Command, getManager: () => Promise<Mod
         const result = await Outdated.run(manager, mods);
 
         if (result.outdated.length === 0) {
-          io.success("All mods and datapacks are up to date");
+          io.success("Everything is up to date");
           return;
         }
 
         io.info(`Found ${result.outdated.length} outdated item(s):\n`);
         console.log(
-          `| ${"Name".padEnd(30)} | ${"Type".padEnd(9)} | ${"Current".padEnd(20)} | ${"Wanted".padEnd(20)} | ${"Latest".padEnd(20)} |`,
+          `| ${"Name".padEnd(30)} | ${"Type".padEnd(12)} | ${"Current".padEnd(20)} | ${"Wanted".padEnd(20)} | ${"Latest".padEnd(20)} |`,
         );
-        console.log("-".repeat(115));
+        console.log("-".repeat(118));
 
         for (const entry of result.outdated) {
           const label = entry.disabled ? `${entry.key} (disabled)` : entry.key;
           console.log(
-            `| ${label.padEnd(30)} | ${entry.kind.padEnd(9)} | ${entry.current.padEnd(20)} | ${(entry.wanted ?? "-").padEnd(20)} | ${(entry.latest ?? "-").padEnd(20)} |`,
+            `| ${label.padEnd(30)} | ${entry.kind.padEnd(12)} | ${entry.current.padEnd(20)} | ${(entry.wanted ?? "-").padEnd(20)} | ${(entry.latest ?? "-").padEnd(20)} |`,
           );
         }
 

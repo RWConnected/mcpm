@@ -5,6 +5,18 @@ import {join} from "path";
 import {createHash} from "crypto";
 import type {ModManager} from "./mod-manager.js";
 import {modEntryToKey, type ResourceKind} from "../models/manifest.js";
+import {lockResourceMap} from "../models/lockfile.js";
+
+const RESOURCE_KINDS = ["mod", "datapack", "resourcepack", "shaderpack"] as const;
+
+function dirFor(manager: ModManager, kind: ResourceKind): string {
+  switch (kind) {
+    case "datapack": return manager.config.datapacksDir;
+    case "resourcepack": return manager.config.resourcepacksDir;
+    case "shaderpack": return manager.config.shaderpacksDir;
+    default: return manager.config.modsDir;
+  }
+}
 
 export class Install {
   static async runWithManager(
@@ -12,8 +24,8 @@ export class Install {
     noCache: boolean,
     forceRehash: boolean,
   ): Promise<void> {
-    // 1. Refresh all manifest mods + datapacks (update lock), disabled ones included
-    for (const kind of ["mod", "datapack"] as const) {
+    // 1. Refresh all manifest entries (update lock), disabled ones included
+    for (const kind of RESOURCE_KINDS) {
       for (const entry of manager.manifestEntries(kind)) {
         await manager.refreshMod(entry, undefined, false, false, kind);
       }
@@ -25,8 +37,10 @@ export class Install {
     // 3. Save manifest + lock
     manager.saveAll();
 
-    await Install.installResource(manager, "mod", manager.config.modsDir, "jar", noCache, forceRehash);
-    await Install.installResource(manager, "datapack", manager.config.datapacksDir, "zip", noCache, forceRehash);
+    for (const kind of RESOURCE_KINDS) {
+      const extension = kind === "mod" ? "jar" : "zip";
+      await Install.installResource(manager, kind, dirFor(manager, kind), extension, noCache, forceRehash);
+    }
   }
 
   private static async installResource(
@@ -39,7 +53,7 @@ export class Install {
   ): Promise<void> {
     const entries = manager.manifestEntries(kind);
     const disabledKeys = new Set(entries.filter((m) => m.disabled).map((m) => modEntryToKey(m)));
-    const lockMap = kind === "datapack" ? manager.lockService.lock.datapacks : manager.lockService.lock.mods;
+    const lockMap = lockResourceMap(manager.lockService.lock, kind);
 
     const cacheDir = manager.config.cacheDir;
     mkdirSync(cacheDir, { recursive: true });

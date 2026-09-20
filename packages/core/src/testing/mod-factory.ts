@@ -31,7 +31,7 @@ export class ModFactory {
   }
 
   static create(id: string, version: string, kind: ResourceKind = "mod"): ModFactory {
-    const extension = kind === "datapack" ? "zip" : "jar";
+    const extension = kind === "mod" ? "jar" : "zip";
     return new ModFactory(
       id,
       version,
@@ -51,7 +51,7 @@ export class ModFactory {
   }
 
   get filename(): string {
-    const extension = this.kind === "datapack" ? "zip" : "jar";
+    const extension = this.kind === "mod" ? "jar" : "zip";
     return `${this.id}-${this.version}.${extension}`;
   }
 
@@ -60,17 +60,27 @@ export class ModFactory {
   }
 
   seedCache(config: Config): this {
-    writeFileSync(join(config.cacheDir, this.filename), this.content);
-    return this;
+    return this.seedInto(config.cacheDir);
   }
 
   seedMod(config: Config): this {
-    writeFileSync(join(config.modsDir, this.filename), this.content);
-    return this;
+    return this.seedInto(config.modsDir);
   }
 
   seedDatapack(config: Config): this {
-    writeFileSync(join(config.datapacksDir, this.filename), this.content);
+    return this.seedInto(config.datapacksDir);
+  }
+
+  seedResourcepack(config: Config): this {
+    return this.seedInto(config.resourcepacksDir);
+  }
+
+  seedShaderpack(config: Config): this {
+    return this.seedInto(config.shaderpacksDir);
+  }
+
+  private seedInto(dir: string): this {
+    writeFileSync(join(dir, this.filename), this.content);
     return this;
   }
 

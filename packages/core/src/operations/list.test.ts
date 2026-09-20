@@ -65,4 +65,23 @@ describe("List", () => {
     expect(prints.some((m) => m.includes("modrinth:sodium"))).toBe(true);
     expect(prints.some((m) => m.includes("modrinth:vanilla-tweaks"))).toBe(true);
   });
+
+  it("lists resourcepacks and shaderpacks in their own sections", async () => {
+    const resourcepack = ModFactory.create("modrinth:faithful", "1.0.0", "resourcepack");
+    const shaderpack = ModFactory.create("modrinth:complementary", "1.0.0", "shaderpack");
+    ManifestFactory.create("1.21.11").withResourcepack(resourcepack).withShaderpack(shaderpack).writeTo(ctx.paths);
+    LockfileFactory.create().writeTo(ctx.paths);
+
+    const manager = createManager(ctx);
+    await manager.load();
+
+    await List.run(manager);
+
+    const infos = ctx.io.messages.filter((m) => m.level === "info").map((m) => m.msg);
+    const prints = ctx.io.messages.filter((m) => m.level === "print").map((m) => m.msg);
+    expect(infos.some((m) => m.includes("Installed resourcepacks"))).toBe(true);
+    expect(infos.some((m) => m.includes("Installed shaderpacks"))).toBe(true);
+    expect(prints.some((m) => m.includes("modrinth:faithful"))).toBe(true);
+    expect(prints.some((m) => m.includes("modrinth:complementary"))).toBe(true);
+  });
 });

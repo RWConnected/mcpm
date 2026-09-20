@@ -4,8 +4,8 @@ import {Install, type ModManager, Upgrade} from "@mcpm/core";
 export function registerUpgrade(program: Command, getManager: () => Promise<ModManager>): void {
   program
     .command("upgrade")
-    .description("Upgrade mods to newer compatible versions")
-    .argument("[mods...]", "Mods to upgrade (id, slug or substring)")
+    .description("Upgrade mods, datapacks, resourcepacks and shaderpacks to newer compatible versions")
+    .argument("[mods...]", "Items to upgrade (id, slug or substring)")
     .option("--no-cache", "Skip cache")
     .option("--force-rehash", "Force re-verification of hashes")
     .option("--ignore-constraints", "Ignore version constraints")

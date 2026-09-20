@@ -83,7 +83,7 @@ describe("validateProviders", () => {
   it("rejects a vanillatweaks provider with no bundles at all", () => {
     const { invalid } = validateProviders([{ id: "vt1", type: "vanillatweaks" }]);
     expect(invalid).toHaveLength(1);
-    expect(invalid[0]?.reason).toContain("missing datapacks or craftingtweaks bundles");
+    expect(invalid[0]?.reason).toContain("missing datapacks, craftingtweaks or resourcepacks bundles");
   });
 
   it("rejects a vanillatweaks provider with a bundle name shared between datapacks and craftingtweaks", () => {
@@ -107,6 +107,27 @@ describe("validateProviders", () => {
         type: "vanillatweaks",
         datapacks: { core: { qol: ["armor statues"] } },
         craftingtweaks: { tools: { hermitcraft: ["silence hoppers"] } },
+      },
+    ]);
+    expect(valid).toHaveLength(1);
+    expect(invalid).toHaveLength(0);
+  });
+
+  it("accepts a vanillatweaks provider with only resourcepacks bundles", () => {
+    const { valid, invalid } = validateProviders([
+      { id: "vt1", type: "vanillatweaks", resourcepacks: { core: { "faithful 32x": ["clear glass"] } } },
+    ]);
+    expect(valid).toHaveLength(1);
+    expect(invalid).toHaveLength(0);
+  });
+
+  it("allows the same bundle name in resourcepacks and datapacks (different lookup path, no collision)", () => {
+    const { valid, invalid } = validateProviders([
+      {
+        id: "vt1",
+        type: "vanillatweaks",
+        datapacks: { core: { qol: ["armor statues"] } },
+        resourcepacks: { core: { "faithful 32x": ["clear glass"] } },
       },
     ]);
     expect(valid).toHaveLength(1);

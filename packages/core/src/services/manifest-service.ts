@@ -14,7 +14,11 @@ import {
 } from "../models/manifest.js";
 import {type ProviderConfig, validateProviders} from "../models/provider-config.js";
 
-const RECOMMENDED_IGNORES = ["mods/", "datapacks/", "crash-reports/", "logs/", "saves/"];
+const RESOURCE_FIELDS = ["mods", "datapacks", "resourcepacks", "shaderpacks"] as const;
+
+const RECOMMENDED_IGNORES = [
+  "mods/", "datapacks/", "resourcepacks/", "shaderpacks/", "crash-reports/", "logs/", "saves/",
+];
 
 export class ManifestService {
   manifest: Manifest;
@@ -31,24 +35,21 @@ export class ManifestService {
     const content = readFileSync(this.paths.manifestPath, "utf-8");
     const raw = JSON.parse(content);
 
-    // Convert mods object to Map<string, VersionSpec>
-    const mods = new Map<string, VersionSpec>();
-    if (raw.mods && typeof raw.mods === "object") {
-      for (const [key, value] of Object.entries(raw.mods)) {
-        mods.set(key, versionSpecFromString(value as string));
+    // Convert each resource object to Map<string, VersionSpec>
+    const resourceMaps: Record<string, Map<string, VersionSpec>> = {};
+    for (const field of RESOURCE_FIELDS) {
+      const map = new Map<string, VersionSpec>();
+      if (raw[field] && typeof raw[field] === "object") {
+        for (const [key, value] of Object.entries(raw[field])) {
+          map.set(key, versionSpecFromString(value as string));
+        }
       }
-    }
-
-    const datapacks = new Map<string, VersionSpec>();
-    if (raw.datapacks && typeof raw.datapacks === "object") {
-      for (const [key, value] of Object.entries(raw.datapacks)) {
-        datapacks.set(key, versionSpecFromString(value as string));
-      }
+      resourceMaps[field] = map;
     }
 
     const providers: ProviderConfig[] | undefined = Array.isArray(raw.providers) ? raw.providers : undefined;
 
-    const partial: PartialManifest = { ...raw, mods, datapacks, providers };
+    const partial: PartialManifest = { ...raw, ...resourceMaps, providers };
     this.manifest = mergeManifest(partial);
 
     const { invalid } = validateProviders(this.manifest.providers);
@@ -93,17 +94,6 @@ export class ManifestService {
   }
 
   private serializeManifest(): string {
-    // Convert Map to ordered object for JSON serialization
-    const modsObj: Record<string, string> = {};
-    for (const [key, spec] of this.manifest.mods) {
-      modsObj[key] = versionSpecToString(spec);
-    }
-
-    const datapacksObj: Record<string, string> = {};
-    for (const [key, spec] of this.manifest.datapacks) {
-      datapacksObj[key] = versionSpecToString(spec);
-    }
-
     const obj: Record<string, unknown> = {
       name: this.manifest.name,
       version: this.manifest.version,
@@ -114,8 +104,16 @@ export class ManifestService {
     obj.modloader = this.manifest.modloader;
     obj.minecraft_version = this.manifest.minecraft_version;
     obj.default_provider = this.manifest.default_provider;
-    obj.mods = modsObj;
-    obj.datapacks = datapacksObj;
+
+    // Convert each resource Map to an ordered object for JSON serialization
+    for (const field of RESOURCE_FIELDS) {
+      const resourceObj: Record<string, string> = {};
+      for (const [key, spec] of this.manifest[field]) {
+        resourceObj[key] = versionSpecToString(spec);
+      }
+      obj[field] = resourceObj;
+    }
+
     if (this.manifest.license !== undefined) obj.license = this.manifest.license;
     if (this.manifest.homepage !== undefined) obj.homepage = this.manifest.homepage;
     if (this.manifest.tags !== undefined) obj.tags = this.manifest.tags;

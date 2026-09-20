@@ -2,9 +2,8 @@
 
 import type {ModManager} from "./mod-manager.js";
 import type {Provider, ResourceKind, VersionSpec} from "../models/manifest.js";
-import {insertModEntry, isSemverRange} from "../models/manifest.js";
+import {insertModEntry, isSemverRange, loadersForKind} from "../models/manifest.js";
 import type {VersionResult} from "../models/repository.js";
-import {asStr} from "../helpers/utils.js";
 
 interface FoundProject {
   id: string;
@@ -40,7 +39,7 @@ export class Add {
     const versions = await manager.repoService.getVersions(
       `${provider}:${project.id}`,
       [manager.manifestService.manifest.minecraft_version],
-      kind === "datapack" ? ["datapack"] : [asStr(manager.manifestService.manifest.modloader)],
+      loadersForKind(manager.manifestService.manifest, kind),
       options.version,
     );
 

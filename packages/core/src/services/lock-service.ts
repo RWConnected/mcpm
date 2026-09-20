@@ -4,9 +4,10 @@ import {existsSync, readFileSync, writeFileSync} from "fs";
 import type {ConfigPaths} from "../models/config.js";
 import type {IO} from "../io/io.types.js";
 import type {LockEntry, LockFile} from "../models/lockfile.js";
-import {emptyLockFile} from "../models/lockfile.js";
+import {emptyLockFile, lockResourceMap} from "../models/lockfile.js";
 import type {Manifest, ModEntry, ResourceKind, VersionSpec} from "../models/manifest.js";
 import {
+  loadersForKind,
   manifestKeyForEntry,
   modEntryToKey,
   modsAsEntries,
@@ -15,8 +16,9 @@ import {
 } from "../models/manifest.js";
 import type {VersionResult} from "../models/repository.js";
 import type {RepositoryService} from "../repositories/repository-service.js";
-import {asStr} from "../helpers/utils.js";
 import {compareVersions, resolveVersion, satisfies} from "../helpers/semver.js";
+
+const RESOURCE_KINDS = ["mod", "datapack", "resourcepack", "shaderpack"] as const;
 
 export class LockService {
   lock: LockFile;
@@ -37,19 +39,17 @@ export class LockService {
     try {
       const content = readFileSync(this.paths.lockPath, "utf-8");
       const raw = JSON.parse(content);
-      const mods = new Map<string, LockEntry>();
-      if (raw.mods && typeof raw.mods === "object") {
-        for (const [key, value] of Object.entries(raw.mods)) {
-          mods.set(key, value as LockEntry);
+      const lock = emptyLockFile();
+      for (const kind of RESOURCE_KINDS) {
+        const field = `${kind}s`;
+        const map = lockResourceMap(lock, kind);
+        if (raw[field] && typeof raw[field] === "object") {
+          for (const [key, value] of Object.entries(raw[field])) {
+            map.set(key, value as LockEntry);
+          }
         }
       }
-      const datapacks = new Map<string, LockEntry>();
-      if (raw.datapacks && typeof raw.datapacks === "object") {
-        for (const [key, value] of Object.entries(raw.datapacks)) {
-          datapacks.set(key, value as LockEntry);
-        }
-      }
-      this.lock = { mods, datapacks };
+      this.lock = lock;
     } catch {
       this.lock = emptyLockFile();
     }
@@ -58,7 +58,12 @@ export class LockService {
   /** Save lockfile to disk, sorting each list alphabetically by key */
   save(): void {
     const json = JSON.stringify(
-      { mods: sortedRecord(this.lock.mods), datapacks: sortedRecord(this.lock.datapacks) },
+      {
+        mods: sortedRecord(this.lock.mods),
+        datapacks: sortedRecord(this.lock.datapacks),
+        resourcepacks: sortedRecord(this.lock.resourcepacks),
+        shaderpacks: sortedRecord(this.lock.shaderpacks),
+      },
       null,
       2,
     );
@@ -76,7 +81,7 @@ export class LockService {
     kind: ResourceKind = "mod",
   ): Promise<boolean> {
     const key = modEntryToKey(manifestMod);
-    const lockMap = kind === "datapack" ? this.lock.datapacks : this.lock.mods;
+    const lockMap = lockResourceMap(this.lock, kind);
     const prev = lockMap.get(key);
 
     const versionOutdated = prev
@@ -96,7 +101,7 @@ export class LockService {
       : await repoService.getVersions(
           projectId,
           [manifest.minecraft_version],
-          kind === "datapack" ? ["datapack"] : [asStr(manifest.modloader)],
+          loadersForKind(manifest, kind),
           wantedVersion,
         );
 
@@ -152,12 +157,12 @@ export class LockService {
     return true;
   }
 
-  /** Remove lock entries not present in the manifest. Returns set of removed keys (mods + datapacks). */
+  /** Remove lock entries not present in the manifest. Returns set of removed keys, across all kinds. */
   prune(manifest: Manifest): Set<string> {
     const removed = new Set<string>();
-    for (const kind of ["mod", "datapack"] as const) {
+    for (const kind of RESOURCE_KINDS) {
       const manifestKeys = new Set(modsAsEntries(manifest, kind).map((e) => modEntryToKey(e)));
-      const lockMap = kind === "datapack" ? this.lock.datapacks : this.lock.mods;
+      const lockMap = lockResourceMap(this.lock, kind);
       for (const key of lockMap.keys()) {
         if (!manifestKeys.has(key)) {
           lockMap.delete(key);
@@ -168,11 +173,10 @@ export class LockService {
     return removed;
   }
 
-  /** Get the resolved version for a manifest mod/datapack entry */
+  /** Get the resolved version for a manifest entry of the given kind */
   getVersion(manifestMod: ModEntry, kind: ResourceKind = "mod"): string | undefined {
     const key = modEntryToKey(manifestMod);
-    const lockMap = kind === "datapack" ? this.lock.datapacks : this.lock.mods;
-    return lockMap.get(key)?.version;
+    return lockResourceMap(this.lock, kind).get(key)?.version;
   }
 }
 

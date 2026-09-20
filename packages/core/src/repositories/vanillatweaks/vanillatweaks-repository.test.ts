@@ -94,6 +94,64 @@ describe("VanillaTweaksRepository", () => {
     expect(versions).toEqual([]);
   });
 
+  it("POSTs the resourcepacks selection wrapped as rpcategories, only when loaders signal resourcepack", async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(url);
+      if (url.includes("zipresourcepacks.php")) {
+        return { ok: true, json: async () => ({ status: "success", link: "/download/rp.zip" }) } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+    }) as unknown as typeof fetch;
+
+    const repo = new VanillaTweaksRepository({
+      id: "vt1",
+      type: "vanillatweaks",
+      resourcepacks: { core: { "faithful 32x": ["clear glass"] } },
+    });
+
+    const versions = await repo.getVersions("core", ["1.21"], ["resourcepack"], "1.21");
+
+    expect(calls[0]).toBe("https://vanillatweaks.net/assets/server/zipresourcepacks.php");
+    expect(versions).toHaveLength(1);
+  });
+
+  it("does not find a resourcepacks bundle when loaders don't signal resourcepack, even with a matching slug", async () => {
+    const repo = new VanillaTweaksRepository({
+      id: "vt1",
+      type: "vanillatweaks",
+      resourcepacks: { core: { "faithful 32x": ["clear glass"] } },
+    });
+    // loaders = ["datapack"] (or []) must not fall through to the resourcepacks map
+    const versions = await repo.getVersions("core", ["1.21"], ["datapack"], "1.21");
+    expect(versions).toEqual([]);
+  });
+
+  it("a resourcepacks bundle and a datapacks bundle can share the same slug without colliding", async () => {
+    globalThis.fetch = (async (url: string) => {
+      if (url.includes("zipresourcepacks.php")) {
+        return { ok: true, json: async () => ({ status: "success", link: "/download/rp.zip" }) } as Response;
+      }
+      if (url.includes("zipdatapacks.php")) {
+        return { ok: true, json: async () => ({ status: "success", link: "/download/dp.zip" }) } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+    }) as unknown as typeof fetch;
+
+    const repo = new VanillaTweaksRepository({
+      id: "vt1",
+      type: "vanillatweaks",
+      datapacks: { core: { qol: ["armor statues"] } },
+      resourcepacks: { core: { "faithful 32x": ["clear glass"] } },
+    });
+
+    const dp = await repo.getVersions("core", ["1.21"], ["datapack"], "1.21");
+    const rp = await repo.getVersions("core", ["1.21"], ["resourcepack"], "1.21");
+
+    expect(dp[0]?.url).toBe("https://vanillatweaks.net/download/dp.zip");
+    expect(rp[0]?.url).toBe("https://vanillatweaks.net/download/rp.zip");
+  });
+
   it("returns nothing when the zip-builder request fails", async () => {
     globalThis.fetch = (async () => ({ ok: false }) as Response) as unknown as typeof fetch;
     const repo = new VanillaTweaksRepository({

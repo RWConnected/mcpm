@@ -1,7 +1,7 @@
 import type {ModManager} from "./mod-manager.js";
 import type {ModEntry, ResourceKind} from "../models/manifest.js";
-import {modEntryToKey} from "../models/manifest.js";
-import {asStr} from "../helpers/utils.js";
+import {loadersForKind, modEntryToKey} from "../models/manifest.js";
+import {lockResourceMap} from "../models/lockfile.js";
 import {resolveVersion} from "../helpers/semver.js";
 
 export interface OutdatedEntry {
@@ -23,7 +23,7 @@ export class Outdated {
     manager: ModManager,
     mods: string[],
   ): Promise<OutdatedResult> {
-    const allEntries = (["mod", "datapack"] as const).flatMap((kind) =>
+    const allEntries = (["mod", "datapack", "resourcepack", "shaderpack"] as const).flatMap((kind) =>
       manager.manifestEntries(kind).map((entry) => ({ entry, kind })),
     );
     const toCheck = mods.length === 0
@@ -57,14 +57,13 @@ export class Outdated {
     kind: ResourceKind,
   ): Promise<OutdatedEntry | undefined> {
     const key = modEntryToKey(m);
-    const lockMap = kind === "datapack" ? manager.lockService.lock.datapacks : manager.lockService.lock.mods;
-    const lockEntry = lockMap.get(key);
+    const lockEntry = lockResourceMap(manager.lockService.lock, kind).get(key);
     if (!lockEntry) return undefined;
 
     const versions = await manager.repoService.getVersions(
       key,
       [manager.manifestService.manifest.minecraft_version],
-      kind === "datapack" ? ["datapack"] : [asStr(manager.manifestService.manifest.modloader)],
+      loadersForKind(manager.manifestService.manifest, kind),
     );
     if (versions.length === 0) return undefined;
 
