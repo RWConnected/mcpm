@@ -8,9 +8,10 @@ describe("validateProviders", () => {
       { id: "url1", type: "url", urlTemplate: "https://example.com/{slug}/{version}.jar" },
       { id: "gh1", type: "github", owner: "rickiewars", repo: "gui-shop" },
       { id: "gl1", type: "gitlab", owner: "rickiewars", repo: "gui-shop" },
+      { id: "vt1", type: "vanillatweaks", datapacks: { core: { "quality of life": ["armor statues"] } } },
     ];
     const { valid, invalid } = validateProviders(providers);
-    expect(valid).toHaveLength(4);
+    expect(valid).toHaveLength(5);
     expect(invalid).toHaveLength(0);
   });
 
@@ -76,6 +77,39 @@ describe("validateProviders", () => {
   it("returns empty result for undefined providers", () => {
     const { valid, invalid } = validateProviders(undefined);
     expect(valid).toHaveLength(0);
+    expect(invalid).toHaveLength(0);
+  });
+
+  it("rejects a vanillatweaks provider with no bundles at all", () => {
+    const { invalid } = validateProviders([{ id: "vt1", type: "vanillatweaks" }]);
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]?.reason).toContain("missing datapacks or craftingtweaks bundles");
+  });
+
+  it("rejects a vanillatweaks provider with a bundle name shared between datapacks and craftingtweaks", () => {
+    const { invalid } = validateProviders([
+      {
+        id: "vt1",
+        type: "vanillatweaks",
+        datapacks: { core: { qol: ["armor statues"] } },
+        craftingtweaks: { core: { hermitcraft: ["silence hoppers"] } },
+      },
+    ]);
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]?.reason).toContain("core");
+    expect(invalid[0]?.reason).toContain("both datapacks and craftingtweaks");
+  });
+
+  it("accepts a vanillatweaks provider with disjoint bundle names across datapacks and craftingtweaks", () => {
+    const { valid, invalid } = validateProviders([
+      {
+        id: "vt1",
+        type: "vanillatweaks",
+        datapacks: { core: { qol: ["armor statues"] } },
+        craftingtweaks: { tools: { hermitcraft: ["silence hoppers"] } },
+      },
+    ]);
+    expect(valid).toHaveLength(1);
     expect(invalid).toHaveLength(0);
   });
 });

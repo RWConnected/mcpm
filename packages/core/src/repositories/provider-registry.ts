@@ -7,6 +7,7 @@ import {ModrinthRepository} from "./modrinth/modrinth-repository.js";
 import {LocalRepository} from "./local/local-repository.js";
 import {UrlRepository} from "./url/url-repository.js";
 import {GitReleaseRepository} from "./git-release/git-release-repository.js";
+import {VanillaTweaksRepository} from "./vanillatweaks/vanillatweaks-repository.js";
 import {InvalidProviderRepository} from "./invalid-provider-repository.js";
 
 /** Build a RepositoryService with the built-in Modrinth provider plus every provider
@@ -29,6 +30,9 @@ export function buildRepositoryService(manifest: Manifest, config: Config, io: I
       case "github":
       case "gitlab":
         service.addProvider(providerConfig.id, new GitReleaseRepository(providerConfig));
+        break;
+      case "vanillatweaks":
+        service.addProvider(providerConfig.id, new VanillaTweaksRepository(providerConfig));
         break;
     }
   }

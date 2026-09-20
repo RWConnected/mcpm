@@ -13,7 +13,8 @@ export {
 
 export type {
   ProviderConfig, LocalProviderConfig, UrlProviderConfig, GithubProviderConfig,
-  GitlabProviderConfig, InvalidProviderConfig, ValidateProvidersResult, McVersionMatchConfig,
+  GitlabProviderConfig, VanillaTweaksProviderConfig, VanillaTweaksSelection,
+  InvalidProviderConfig, ValidateProvidersResult, McVersionMatchConfig,
 } from "./models/provider-config.js";
 export { validateProviders } from "./models/provider-config.js";
 
@@ -46,6 +47,7 @@ export { ModrinthRepository } from "./repositories/modrinth/modrinth-repository.
 export { LocalRepository } from "./repositories/local/local-repository.js";
 export { UrlRepository } from "./repositories/url/url-repository.js";
 export { GitReleaseRepository } from "./repositories/git-release/git-release-repository.js";
+export { VanillaTweaksRepository } from "./repositories/vanillatweaks/vanillatweaks-repository.js";
 export { InvalidProviderRepository } from "./repositories/invalid-provider-repository.js";
 export { buildRepositoryService } from "./repositories/provider-registry.js";
 

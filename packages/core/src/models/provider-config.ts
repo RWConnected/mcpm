@@ -51,7 +51,25 @@ export interface GitlabProviderConfig extends McVersionMatchConfig {
   readonly assetPattern?: string;
 }
 
-export type ProviderConfig = LocalProviderConfig | UrlProviderConfig | GithubProviderConfig | GitlabProviderConfig;
+/** One bundle's pack selection, grouped by VanillaTweaks category name -> pack names. */
+export type VanillaTweaksSelection = Record<string, string[]>;
+
+export interface VanillaTweaksProviderConfig {
+  readonly id: string;
+  readonly type: "vanillatweaks";
+  /** Bundle name -> category->packs selection, POSTed as "dpcategories". */
+  readonly datapacks?: Record<string, VanillaTweaksSelection>;
+  /** Bundle name -> category->packs selection, POSTed as "ctcategories". Datapacks under the hood,
+   * kept separate only because VanillaTweaks' zip endpoint needs the right wrapper key per type. */
+  readonly craftingtweaks?: Record<string, VanillaTweaksSelection>;
+}
+
+export type ProviderConfig =
+  | LocalProviderConfig
+  | UrlProviderConfig
+  | GithubProviderConfig
+  | GitlabProviderConfig
+  | VanillaTweaksProviderConfig;
 
 export interface InvalidProviderConfig {
   readonly config: ProviderConfig;
@@ -98,6 +116,18 @@ function validateOne(config: ProviderConfig): string | undefined {
       if (!isNonEmptyString(config.repo)) return "missing repo";
       if (!compilesAsRegex(config.mcVersionPattern)) return "mcVersionPattern is not a valid regex";
       if (!compilesAsRegex(config.assetPattern)) return "assetPattern is not a valid regex";
+      return undefined;
+    }
+    case "vanillatweaks": {
+      const datapackNames = Object.keys(config.datapacks ?? {});
+      const craftingtweakNames = Object.keys(config.craftingtweaks ?? {});
+      if (datapackNames.length === 0 && craftingtweakNames.length === 0) {
+        return "missing datapacks or craftingtweaks bundles";
+      }
+      const collisions = datapackNames.filter((name) => craftingtweakNames.includes(name));
+      if (collisions.length > 0) {
+        return `bundle name(s) ${collisions.join(", ")} defined in both datapacks and craftingtweaks`;
+      }
       return undefined;
     }
     default: {
