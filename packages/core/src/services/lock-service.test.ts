@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { readFileSync } from "fs";
-import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory, FakeRepository,
-} from "../testing/index.js";
-import { ManifestService } from "./manifest-service.js";
-import { LockService } from "./lock-service.js";
-import { RepositoryService } from "../repositories/repository-service.js";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import {readFileSync} from "fs";
+import {FakeRepository, LockfileFactory, ManifestFactory, ModFactory, TestContext,} from "../testing/index.js";
+import {ManifestService} from "./manifest-service.js";
+import {LockService} from "./lock-service.js";
+import {RepositoryService} from "../repositories/repository-service.js";
 
 describe("LockService", () => {
   let ctx: TestContext;
@@ -146,6 +144,29 @@ describe("LockService", () => {
       const updatedSpec = manifestService.manifest.mods.get("modrinth:sodium");
       expect(updatedSpec?.kind).toBe("range");
       expect(updatedSpec?.value).toBe("^1.1.0");
+    });
+
+    it("dispatches to the mod's own provider, not just modrinth", async () => {
+      const mod = ModFactory.create("myrepo:gui-shop", "2.1.0");
+      ManifestFactory.create("1.21.11").withMod(mod).writeTo(ctx.paths);
+
+      const manifestService = new ManifestService(ctx.paths, ctx.io);
+      manifestService.load();
+
+      const lockService = new LockService(ctx.paths, ctx.io);
+      lockService.load();
+
+      const repoService = new RepositoryService();
+      // Only "myrepo" has the version; "modrinth" is empty. If routing still
+      // defaulted to modrinth (the pre-fix bug), resolution would fail.
+      repoService.addProvider("modrinth", new FakeRepository());
+      repoService.addProvider("myrepo", new FakeRepository().withVersion(mod));
+
+      const entry = { slug: "gui-shop", version: { kind: "exact" as const, value: "2.1.0" }, provider: "myrepo" };
+      const success = await lockService.updateEntry(entry, manifestService.manifest, repoService, undefined, false, false);
+
+      expect(success).toBe(true);
+      expect(lockService.lock.mods.get("myrepo:gui-shop")?.version).toBe("2.1.0");
     });
   });
 

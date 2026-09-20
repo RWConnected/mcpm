@@ -64,7 +64,9 @@ export class Install {
       const dest = noCache ? targetPath : cachePath;
       if (!existsSync(dest) || forceRehash) {
         manager.io.info(`Downloading ${key} ${entry.version}`);
-        await manager.downloadService.download(entry.url, dest, entry.hash);
+        const providerId = key.slice(0, key.indexOf(":"));
+        const headers = manager.repoService.getDownloadHeaders(providerId, entry.url);
+        await manager.downloadService.download(entry.url, dest, entry.hash, headers);
       }
 
       if (!noCache) {

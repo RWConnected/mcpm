@@ -25,6 +25,13 @@ It is CLI-first but I'm planning a future release with an optional **Tauri + Vue
 - **Lockfile system** (`mcpm.lock`) for reproducible installs
 - **Semantic versioning** support (`^1.2`, `>=1.20`, etc.)
 - **Offline caching** of downloaded mods
+- Multiple providers
+  - Modrinth
+  - Maven (beta)
+  - Github releases (beta)
+  - Gitlab releases (beta)
+  - Url (beta)
+  - Local filesystem (beta)
 - **Cross-platform** (Windows, macOS, Linux)
 - **Planned:**  
   - More sources like Curseforge, Github, Gitlab

@@ -1,10 +1,12 @@
 // Models ported from src-tauri/src/app/modules/manifest/models.rs
 
+import type {ProviderConfig} from "./provider-config.js";
+
 export type Side = "client" | "server" | "both" | "unknown";
 
 export type ModLoader = "forge" | "fabric" | "quilt" | "neoforge";
 
-export type Provider = "modrinth" | "curseforge" | "github" | "maven";
+export type Provider = string;
 
 export type VersionSpec =
   | { readonly kind: "exact"; readonly value: string }
@@ -30,6 +32,7 @@ export interface Manifest {
   license?: string;
   homepage?: string;
   tags?: string[];
+  providers?: ProviderConfig[];
 }
 
 export interface PartialManifest {
@@ -45,6 +48,7 @@ export interface PartialManifest {
   license?: string;
   homepage?: string;
   tags?: string[];
+  providers?: ProviderConfig[];
 }
 
 /** Matches Rust's is_semver_range: checks if first char is ^, ~, >, <, or * */
@@ -95,16 +99,26 @@ export function mergeManifest(partial: PartialManifest): Manifest {
     license: partial.license ?? defaults.license,
     homepage: partial.homepage ?? defaults.homepage,
     tags: partial.tags ?? defaults.tags,
+    providers: partial.providers ?? defaults.providers,
   };
 }
 
-const KNOWN_PROVIDERS = new Set<string>(["modrinth", "curseforge", "github", "maven"]);
+/** Provider ids that cannot be used for a custom provider config. */
+export const RESERVED_PROVIDER_IDS = new Set<string>(["disabled", "modrinth", "curseforge", "github", "maven"]);
 
 /** Prefix used on a manifest mod key to mark it as temporarily disabled. */
 export const DISABLED_PREFIX = "disabled:";
 
+/** All known provider ids: built-in "modrinth" plus every configured provider id (valid or not). */
+export function knownProviderIds(manifest: Manifest): Set<string> {
+  const ids = new Set<string>(["modrinth"]);
+  for (const p of manifest.providers ?? []) ids.add(p.id);
+  return ids;
+}
+
 /** Convert manifest mods map to ModEntry array (like Rust's Manifest::mods_as_entries) */
 export function modsAsEntries(manifest: Manifest): ModEntry[] {
+  const knownProviders = knownProviderIds(manifest);
   const entries: ModEntry[] = [];
   for (const [rawKey, version] of manifest.mods) {
     const disabled = rawKey.startsWith(DISABLED_PREFIX);
@@ -114,9 +128,7 @@ export function modsAsEntries(manifest: Manifest): ModEntry[] {
     const providerStr = colonIdx >= 0 ? key.slice(0, colonIdx) : "";
     const slug = colonIdx >= 0 ? key.slice(colonIdx + 1) : key;
 
-    const provider: Provider = KNOWN_PROVIDERS.has(providerStr)
-      ? (providerStr as Provider)
-      : manifest.default_provider;
+    const provider: Provider = knownProviders.has(providerStr) ? providerStr : manifest.default_provider;
 
     entries.push(disabled ? { slug, version, provider, disabled } : { slug, version, provider });
   }

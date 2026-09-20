@@ -1,17 +1,15 @@
 // ModrinthRepository ported from src-tauri/src/app/modules/repositories/modrinth/modrinth_repository.rs
 
-import type { IRepository } from "../repository.interface.js";
-import type { ModResult, VersionResult } from "../../models/repository.js";
-import type { Side } from "../../models/manifest.js";
-import type {
-  SearchResponse,
-  FindResponse,
-  VersionItem,
-} from "./modrinth-models.js";
+import type {IRepository} from "../repository.interface.js";
+import type {ModResult, VersionResult} from "../../models/repository.js";
+import type {Side} from "../../models/manifest.js";
+import type {FindResponse, SearchResponse, VersionItem,} from "./modrinth-models.js";
 
 const PAGINATION_SIZE = 20;
 
 export class ModrinthRepository implements IRepository {
+  readonly supportsDiscovery = true;
+
   private headers: Record<string, string> = {};
 
   constructor(modrinthToken?: string) {

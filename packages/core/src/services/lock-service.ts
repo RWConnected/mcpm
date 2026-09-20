@@ -70,11 +70,13 @@ export class LockService {
       ? !satisfies(manifestMod.version, prev.version)
       : true;
 
-    const projectId = prev ? prev.id : manifestMod.slug;
+    const projectId = `${manifestMod.provider}:${prev ? prev.id : manifestMod.slug}`;
 
     if (!upgrade && !versionOutdated) {
       return true;
     }
+
+    const wantedVersion = manifestMod.version.kind === "exact" ? manifestMod.version.value : undefined;
 
     const versions: VersionResult[] = available
       ? [...available]
@@ -82,6 +84,7 @@ export class LockService {
           projectId,
           [manifest.minecraft_version],
           [asStr(manifest.modloader)],
+          wantedVersion,
         );
 
     if (versions.length === 0) {

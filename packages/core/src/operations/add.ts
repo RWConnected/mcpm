@@ -1,10 +1,16 @@
 // Add operation ported from src-tauri/src/app/modules/core/add.rs
 
-import type { ModManager } from "./mod-manager.js";
-import type { Provider, VersionSpec } from "../models/manifest.js";
-import type { VersionResult } from "../models/repository.js";
-import { isSemverRange, insertModEntry } from "../models/manifest.js";
-import { asStr } from "../helpers/utils.js";
+import type {ModManager} from "./mod-manager.js";
+import type {Provider, VersionSpec} from "../models/manifest.js";
+import {insertModEntry, isSemverRange} from "../models/manifest.js";
+import type {VersionResult} from "../models/repository.js";
+import {asStr} from "../helpers/utils.js";
+
+interface FoundProject {
+  id: string;
+  slug: string;
+  name: string;
+}
 
 export interface AddOptions {
   id: string;
@@ -24,27 +30,16 @@ export class Add {
 
     const provider = options.provider ?? manager.manifestService.manifest.default_provider;
 
-    // Find the project
-    let project;
-    if (options.search) {
-      const results = await manager.repoService.search(options.id, 0);
-      if (results.length === 0) {
-        throw new Error(`No mod found for '${options.id}'`);
-      }
-      const idx = options.searchPicker ? await options.searchPicker(results) : 0;
-      project = results[idx];
-    } else {
-      project = await manager.repoService.find(options.id);
-      if (!project) {
-        throw new Error(`No mod found for '${options.id}'`);
-      }
-    }
+    const project = options.search
+      ? await Add.findViaSearch(manager, options)
+      : await Add.findViaProviderOrSlug(manager, provider, options.id);
 
     // Get compatible versions
     const versions = await manager.repoService.getVersions(
-      project.id,
+      `${provider}:${project.id}`,
       [manager.manifestService.manifest.minecraft_version],
       [asStr(manager.manifestService.manifest.modloader)],
+      options.version,
     );
 
     if (versions.length === 0) {
@@ -82,6 +77,33 @@ export class Add {
 
     await manager.refreshMod(entry, versions, false, false);
     manager.saveAll();
+  }
+
+  /** Fuzzy-searches the catalog for options.id and lets searchPicker choose among the results. */
+  private static async findViaSearch(manager: ModManager, options: AddOptions): Promise<FoundProject> {
+    const results = await manager.repoService.search(options.id, 0);
+    if (results.length === 0) {
+      throw new Error(`No mod found for '${options.id}'`);
+    }
+    const idx = options.searchPicker ? await options.searchPicker(results) : 0;
+    return results[idx];
+  }
+
+  /** Resolves a single mod by exact slug: a real lookup if the provider supports discovery,
+   * otherwise trusts id as the slug outright (local/url/git-release providers). */
+  private static async findViaProviderOrSlug(
+    manager: ModManager,
+    provider: Provider,
+    id: string,
+  ): Promise<FoundProject> {
+    if (!manager.repoService.supportsDiscovery(provider)) {
+      return { id, slug: id, name: id };
+    }
+    const found = await manager.repoService.findInProvider(provider, id);
+    if (!found) {
+      throw new Error(`No mod found for '${id}'`);
+    }
+    return found;
   }
 }
 

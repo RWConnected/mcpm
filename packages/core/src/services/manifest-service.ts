@@ -1,17 +1,18 @@
 // ManifestService ported from src-tauri/src/app/modules/manifest/services.rs
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import type { ConfigPaths } from "../models/config.js";
-import type { IO } from "../io/io.types.js";
+import {existsSync, readFileSync, writeFileSync} from "fs";
+import type {ConfigPaths} from "../models/config.js";
+import type {IO} from "../io/io.types.js";
 import {
+  defaultManifest,
   type Manifest,
+  mergeManifest,
   type PartialManifest,
   type VersionSpec,
-  mergeManifest,
-  defaultManifest,
   versionSpecFromString,
   versionSpecToString,
 } from "../models/manifest.js";
+import {type ProviderConfig, validateProviders} from "../models/provider-config.js";
 
 const RECOMMENDED_IGNORES = ["mods/", "crash-reports/", "logs/", "saves/"];
 
@@ -38,8 +39,15 @@ export class ManifestService {
       }
     }
 
-    const partial: PartialManifest = { ...raw, mods };
+    const providers: ProviderConfig[] | undefined = Array.isArray(raw.providers) ? raw.providers : undefined;
+
+    const partial: PartialManifest = { ...raw, mods, providers };
     this.manifest = mergeManifest(partial);
+
+    const { invalid } = validateProviders(this.manifest.providers);
+    for (const { config, reason } of invalid) {
+      this.io.warn(`Provider '${config.id}' is misconfigured (${reason}); mods using it will fail.`);
+    }
   }
 
   /** Save manifest to disk as pretty JSON */
@@ -98,6 +106,7 @@ export class ManifestService {
     if (this.manifest.license !== undefined) obj.license = this.manifest.license;
     if (this.manifest.homepage !== undefined) obj.homepage = this.manifest.homepage;
     if (this.manifest.tags !== undefined) obj.tags = this.manifest.tags;
+    if (this.manifest.providers !== undefined) obj.providers = this.manifest.providers;
 
     return JSON.stringify(obj, null, 2);
   }

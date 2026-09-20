@@ -7,8 +7,14 @@ export type {
 export {
   isSemverRange, versionSpecFromString, versionSpecToString,
   defaultManifest, mergeManifest, modsAsEntries, modEntryToKey,
-  insertModEntry, removeModEntry,
+  insertModEntry, removeModEntry, knownProviderIds, RESERVED_PROVIDER_IDS,
 } from "./models/manifest.js";
+
+export type {
+  ProviderConfig, LocalProviderConfig, UrlProviderConfig, GithubProviderConfig,
+  GitlabProviderConfig, InvalidProviderConfig, ValidateProvidersResult, McVersionMatchConfig,
+} from "./models/provider-config.js";
+export { validateProviders } from "./models/provider-config.js";
 
 export type { LockEntry, LockFile } from "./models/lockfile.js";
 export { emptyLockFile } from "./models/lockfile.js";
@@ -33,7 +39,14 @@ export { RepositoryService } from "./repositories/repository-service.js";
 
 // Implementations
 export { HttpDownloadService } from "./download/http-download-service.js";
+export { FileDownloadService } from "./download/file-download-service.js";
+export { CompositeDownloadService } from "./download/composite-download-service.js";
 export { ModrinthRepository } from "./repositories/modrinth/modrinth-repository.js";
+export { LocalRepository } from "./repositories/local/local-repository.js";
+export { UrlRepository } from "./repositories/url/url-repository.js";
+export { GitReleaseRepository } from "./repositories/git-release/git-release-repository.js";
+export { InvalidProviderRepository } from "./repositories/invalid-provider-repository.js";
+export { buildRepositoryService } from "./repositories/provider-registry.js";
 
 // Operations
 export { ModManager } from "./operations/mod-manager.js";

@@ -1,7 +1,7 @@
 // RepositoryService ported from src-tauri/src/app/modules/repositories/services.rs
 
-import type { IRepository } from "./repository.interface.js";
-import type { ModResult, VersionResult } from "../models/repository.js";
+import type {IRepository} from "./repository.interface.js";
+import type {ModResult, VersionResult} from "../models/repository.js";
 
 export class RepositoryService {
   private repositories = new Map<string, IRepository>();
@@ -28,10 +28,22 @@ export class RepositoryService {
     return undefined;
   }
 
+  /** Find a mod through one specific registered provider (no fan-out). */
+  async findInProvider(providerId: string, slug: string): Promise<ModResult | undefined> {
+    return this.repositories.get(providerId.toLowerCase())?.find(slug);
+  }
+
+  /** Whether the given provider can look up a mod by slug/query, as opposed to only
+   * resolving versions for an id the caller already knows. Unregistered providers report false. */
+  supportsDiscovery(providerId: string): boolean {
+    return this.repositories.get(providerId.toLowerCase())?.supportsDiscovery ?? false;
+  }
+
   async getVersions(
     projectId: string,
     gameVersions: string[],
     loaders: string[],
+    wantedVersion?: string,
   ): Promise<VersionResult[]> {
     // Split "provider:id" into provider name and clean id
     const colonIdx = projectId.indexOf(":");
@@ -41,6 +53,11 @@ export class RepositoryService {
     const provider = this.repositories.get(providerName);
     if (!provider) return [];
 
-    return provider.getVersions(cleanId, gameVersions, loaders);
+    return provider.getVersions(cleanId, gameVersions, loaders, wantedVersion);
+  }
+
+  /** Auth headers (if any) a provider wants attached when downloading the given asset URL. */
+  getDownloadHeaders(providerId: string, url: string): Record<string, string> | undefined {
+    return this.repositories.get(providerId.toLowerCase())?.getDownloadHeaders?.(url);
   }
 }

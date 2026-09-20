@@ -1,7 +1,7 @@
-import { describe, it, expect } from "bun:test";
-import { RepositoryService } from "./repository-service.js";
-import { FakeRepository } from "../testing/fake-repository.js";
-import { ModFactory } from "../testing/mod-factory.js";
+import {describe, expect, it} from "bun:test";
+import {RepositoryService} from "./repository-service.js";
+import {FakeRepository} from "../testing/fake-repository.js";
+import {ModFactory} from "../testing/mod-factory.js";
 
 describe("RepositoryService", () => {
   describe("getVersions", () => {
@@ -71,6 +71,33 @@ describe("RepositoryService", () => {
 
       const result = await service.find("sodium");
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("supportsDiscovery", () => {
+    class NoDiscoveryRepository extends FakeRepository {
+      override readonly supportsDiscovery: boolean = false;
+    }
+
+    it("reflects the registered provider's capability", () => {
+      const service = new RepositoryService();
+      service.addProvider("modrinth", new FakeRepository());
+      service.addProvider("local1", new NoDiscoveryRepository());
+
+      expect(service.supportsDiscovery("modrinth")).toBe(true);
+      expect(service.supportsDiscovery("local1")).toBe(false);
+    });
+
+    it("is case-insensitive on the provider id", () => {
+      const service = new RepositoryService();
+      service.addProvider("modrinth", new FakeRepository());
+
+      expect(service.supportsDiscovery("MODRINTH")).toBe(true);
+    });
+
+    it("reports false for an unregistered provider", () => {
+      const service = new RepositoryService();
+      expect(service.supportsDiscovery("unknown")).toBe(false);
     });
   });
 });

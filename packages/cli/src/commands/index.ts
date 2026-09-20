@@ -10,6 +10,7 @@ import {registerUpgrade} from "./upgrade.js";
 import {registerOutdated} from "./outdated.js";
 import {registerList} from "./list.js";
 import {registerSearch} from "./search.js";
+import {registerProvider} from "./provider.js";
 
 export function registerCommands(
   program: Command,
@@ -30,4 +31,5 @@ export function registerCommands(
   registerOutdated(program, context.getManager);
   registerList(program, context.getManager);
   registerSearch(program, context.getRepoService, context.getIO);
+  registerProvider(program, context.getManager);
 }

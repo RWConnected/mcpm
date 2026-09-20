@@ -1,15 +1,15 @@
-import { describe, it, expect } from "bun:test";
+import {describe, expect, it} from "bun:test";
 import {
+  defaultManifest,
+  insertModEntry,
+  isSemverRange,
+  mergeManifest,
   type ModEntry,
+  modEntryToKey,
+  modsAsEntries,
+  removeModEntry,
   versionSpecFromString,
   versionSpecToString,
-  isSemverRange,
-  defaultManifest,
-  mergeManifest,
-  modsAsEntries,
-  modEntryToKey,
-  insertModEntry,
-  removeModEntry,
 } from "./manifest.js";
 
 describe("VersionSpec", () => {
@@ -118,8 +118,9 @@ describe("mergeManifest", () => {
 describe("modsAsEntries", () => {
   it("converts mod map to ModEntry array", () => {
     const m = defaultManifest();
+    m.providers = [{ id: "myrepo", type: "local", basePath: "./local-mods" }];
     m.mods.set("modrinth:sodium", { kind: "range", value: "^0.6.0" });
-    m.mods.set("curseforge:jei", { kind: "exact", value: "1.0.0" });
+    m.mods.set("myrepo:jei", { kind: "exact", value: "1.0.0" });
 
     const entries = modsAsEntries(m);
     expect(entries).toHaveLength(2);
@@ -129,8 +130,16 @@ describe("modsAsEntries", () => {
     expect(entries[0].version.kind).toBe("range");
 
     expect(entries[1].slug).toBe("jei");
-    expect(entries[1].provider).toBe("curseforge");
+    expect(entries[1].provider).toBe("myrepo");
     expect(entries[1].version.kind).toBe("exact");
+  });
+
+  it("falls back to default_provider for an unknown provider prefix", () => {
+    const m = defaultManifest();
+    m.mods.set("curseforge:jei", { kind: "exact", value: "1.0.0" });
+
+    const entries = modsAsEntries(m);
+    expect(entries[0].provider).toBe(m.default_provider);
   });
 
   it("uses default provider for unknown prefix", () => {

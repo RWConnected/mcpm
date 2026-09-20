@@ -1,20 +1,23 @@
 #!/usr/bin/env bun
 
-import { Command } from "commander";
-import { mkdirSync } from "node:fs";
+import {Command} from "commander";
+import {mkdirSync} from "node:fs";
 import {
-  resolveConfig,
-  configPaths,
-  ModManager,
-  ModrinthRepository,
-  HttpDownloadService,
-  RepositoryService,
+  buildRepositoryService,
+  CompositeDownloadService,
   type Config,
+  configPaths,
   type ConfigPaths,
+  FileDownloadService,
+  HttpDownloadService,
   type IO,
+  ManifestService,
+  ModManager,
+  RepositoryService,
+  resolveConfig,
 } from "@mcpm/core";
-import { CliIO } from "./cli-io.js";
-import { registerCommands } from "./commands/index.js";
+import {CliIO} from "./cli-io.js";
+import {registerCommands} from "./commands/index.js";
 
 const program = new Command()
   .name("mcpm")
@@ -61,10 +64,22 @@ function ensureConfig(): { config: Config; paths: ConfigPaths; io: IO } {
 
 function getRepoService(): RepositoryService {
   if (_repoService) return _repoService;
-  const { config } = ensureConfig();
-  _repoService = new RepositoryService();
-  _repoService.addProvider("modrinth", new ModrinthRepository(config.modrinthToken));
+  const { config, paths, io } = ensureConfig();
+  const manifestService = new ManifestService(paths, io);
+  try {
+    manifestService.load();
+  } catch {
+    // No manifest yet (e.g. before `init`) - fall back to defaults (modrinth only).
+  }
+  _repoService = buildRepositoryService(manifestService.manifest, config, io);
   return _repoService;
+}
+
+function getDownloadService(): CompositeDownloadService {
+  return new CompositeDownloadService(
+    [{ matches: (url) => url.startsWith("file://"), service: new FileDownloadService() }],
+    new HttpDownloadService(),
+  );
 }
 
 registerCommands(program, {
@@ -76,7 +91,7 @@ registerCommands(program, {
       config,
       paths,
       io,
-      downloadService: new HttpDownloadService(),
+      downloadService: getDownloadService(),
       repositoryService: getRepoService(),
     });
     await manager.load();

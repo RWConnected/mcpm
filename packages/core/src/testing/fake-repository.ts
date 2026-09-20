@@ -1,9 +1,11 @@
-import type { IRepository } from "../repositories/repository.interface.js";
-import type { ModResult, VersionResult } from "../models/repository.js";
-import type { ModFactory } from "./mod-factory.js";
+import type {IRepository} from "../repositories/repository.interface.js";
+import type {ModResult, VersionResult} from "../models/repository.js";
+import type {ModFactory} from "./mod-factory.js";
 
 /** Fake repository for testing — returns pre-configured versions, filters by MC version */
 export class FakeRepository implements IRepository {
+  readonly supportsDiscovery: boolean = true;
+
   private versions: VersionResult[] = [];
 
   withVersion(mf: ModFactory): this {
