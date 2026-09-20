@@ -1,10 +1,10 @@
-import type { Command } from "commander";
-import { List, type ModManager } from "@mcpm/core";
+import type {Command} from "commander";
+import {List, type ModManager} from "@mcpm/core";
 
 export function registerList(program: Command, getManager: () => Promise<ModManager>): void {
   program
     .command("list")
-    .description("List installed mods")
+    .description("List installed mods and datapacks")
     .action(async () => {
       const manager = await getManager();
       try {

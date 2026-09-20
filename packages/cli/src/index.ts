@@ -29,6 +29,7 @@ const program = new Command()
   .option("--cache-dir <path>", "Cache directory (env: MCPM_CACHE_DIR)")
   .option("--output-dir <path>", "Output directory (env: MCPM_OUTPUT_DIR)")
   .option("--mods-dir <path>", "Mods directory (env: MCPM_MODS_DIR)")
+  .option("--datapacks-dir <path>", "Datapacks directory (env: MCPM_DATAPACKS_DIR)")
   .option("--modrinth-token <token>", "Modrinth API token (env: MCPM_MODRINTH_TOKEN)");
 
 // Lazily-initialized state
@@ -48,6 +49,7 @@ function ensureConfig(): { config: Config; paths: ConfigPaths; io: IO } {
     cacheDir: opts.cacheDir,
     outputDir: opts.outputDir,
     modsDir: opts.modsDir,
+    datapacksDir: opts.datapacksDir,
     modrinthToken: opts.modrinthToken,
   });
   _paths = configPaths(_config);
@@ -58,6 +60,7 @@ function ensureConfig(): { config: Config; paths: ConfigPaths; io: IO } {
   mkdirSync(_config.projectDir, { recursive: true });
   mkdirSync(_config.outputDir, { recursive: true });
   mkdirSync(_config.modsDir, { recursive: true });
+  mkdirSync(_config.datapacksDir, { recursive: true });
 
   return { config: _config, paths: _paths, io: _io };
 }

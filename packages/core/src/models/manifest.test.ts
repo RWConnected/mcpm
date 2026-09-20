@@ -203,3 +203,41 @@ describe("removeModEntry", () => {
     expect(result).toBe(false);
   });
 });
+
+describe("datapacks (kind = \"datapack\")", () => {
+  it("defaultManifest starts with an empty datapacks map", () => {
+    expect(defaultManifest().datapacks.size).toBe(0);
+  });
+
+  it("insertModEntry writes to datapacks, not mods, when kind is datapack", () => {
+    const m = defaultManifest();
+    const entry: ModEntry = {
+      slug: "vanilla-tweaks",
+      version: { kind: "exact", value: "1.0.0" },
+      provider: "modrinth",
+    };
+    insertModEntry(m, entry, "datapack");
+    expect(m.datapacks.has("modrinth:vanilla-tweaks")).toBe(true);
+    expect(m.mods.has("modrinth:vanilla-tweaks")).toBe(false);
+  });
+
+  it("modsAsEntries reads from datapacks when kind is datapack", () => {
+    const m = defaultManifest();
+    m.mods.set("modrinth:sodium", { kind: "exact", value: "1.0.0" });
+    m.datapacks.set("modrinth:vanilla-tweaks", { kind: "exact", value: "1.0.0" });
+
+    expect(modsAsEntries(m, "datapack")).toHaveLength(1);
+    expect(modsAsEntries(m, "datapack")[0].slug).toBe("vanilla-tweaks");
+    expect(modsAsEntries(m)).toHaveLength(1);
+  });
+
+  it("removeModEntry removes from datapacks when kind is datapack, leaving mods untouched", () => {
+    const m = defaultManifest();
+    m.mods.set("modrinth:sodium", { kind: "exact", value: "1.0.0" });
+    m.datapacks.set("modrinth:vanilla-tweaks", { kind: "exact", value: "1.0.0" });
+
+    expect(removeModEntry(m, "modrinth", "vanilla-tweaks", "datapack")).toBe(true);
+    expect(m.datapacks.has("modrinth:vanilla-tweaks")).toBe(false);
+    expect(m.mods.has("modrinth:sodium")).toBe(true);
+  });
+});

@@ -1,8 +1,8 @@
 // Config model ported from src-tauri/src/app/config.rs
 // Key change: no global singleton — pure functions return Config objects
 
-import { join, isAbsolute } from "path";
-import { homedir } from "os";
+import {isAbsolute, join} from "path";
+import {homedir} from "os";
 
 export interface Config {
   readonly verbose: boolean;
@@ -11,6 +11,7 @@ export interface Config {
   readonly projectDir: string;
   readonly outputDir: string;
   readonly modsDir: string;
+  readonly datapacksDir: string;
   readonly modrinthToken?: string;
 }
 
@@ -27,6 +28,7 @@ export interface ConfigOptions {
   projectDir?: string;
   outputDir?: string;
   modsDir?: string;
+  datapacksDir?: string;
   modrinthToken?: string;
 }
 
@@ -35,6 +37,7 @@ export function resolveConfig(options: ConfigOptions = {}): Config {
   const projectDir = resolveProjectDir(options.projectDir);
   const outputDir = resolveRelativeTo(options.outputDir, "MCPM_OUTPUT_DIR", projectDir);
   const modsDir = resolveRelativeTo(options.modsDir, "MCPM_MODS_DIR", outputDir, "mods");
+  const datapacksDir = resolveRelativeTo(options.datapacksDir, "MCPM_DATAPACKS_DIR", outputDir, "datapacks");
   const cacheDir = resolveCacheDir(options.cacheDir);
 
   return Object.freeze({
@@ -44,6 +47,7 @@ export function resolveConfig(options: ConfigOptions = {}): Config {
     projectDir,
     outputDir,
     modsDir,
+    datapacksDir,
     modrinthToken: resolveOptionalParam(options.modrinthToken, "MCPM_MODRINTH_TOKEN"),
   });
 }

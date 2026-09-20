@@ -8,6 +8,9 @@ export type ModLoader = "forge" | "fabric" | "quilt" | "neoforge";
 
 export type Provider = string;
 
+/** Which manifest/lock list an entry belongs to. */
+export type ResourceKind = "mod" | "datapack";
+
 export type VersionSpec =
   | { readonly kind: "exact"; readonly value: string }
   | { readonly kind: "range"; readonly value: string };
@@ -29,6 +32,7 @@ export interface Manifest {
   minecraft_version: string;
   default_provider: Provider;
   mods: Map<string, VersionSpec>;
+  datapacks: Map<string, VersionSpec>;
   license?: string;
   homepage?: string;
   tags?: string[];
@@ -45,6 +49,7 @@ export interface PartialManifest {
   minecraft_version?: string;
   default_provider?: Provider;
   mods?: Map<string, VersionSpec>;
+  datapacks?: Map<string, VersionSpec>;
   license?: string;
   homepage?: string;
   tags?: string[];
@@ -80,6 +85,7 @@ export function defaultManifest(): Manifest {
     minecraft_version: "1.21.7",
     default_provider: "modrinth",
     mods: new Map(),
+    datapacks: new Map(),
   };
 }
 
@@ -96,6 +102,7 @@ export function mergeManifest(partial: PartialManifest): Manifest {
     minecraft_version: partial.minecraft_version ?? defaults.minecraft_version,
     default_provider: partial.default_provider ?? defaults.default_provider,
     mods: partial.mods ?? new Map(),
+    datapacks: partial.datapacks ?? new Map(),
     license: partial.license ?? defaults.license,
     homepage: partial.homepage ?? defaults.homepage,
     tags: partial.tags ?? defaults.tags,
@@ -116,11 +123,16 @@ export function knownProviderIds(manifest: Manifest): Set<string> {
   return ids;
 }
 
-/** Convert manifest mods map to ModEntry array (like Rust's Manifest::mods_as_entries) */
-export function modsAsEntries(manifest: Manifest): ModEntry[] {
+/** Returns the manifest map for the given resource kind ("mod" -> mods, "datapack" -> datapacks). */
+export function resourceMap(manifest: Manifest, kind: ResourceKind = "mod"): Map<string, VersionSpec> {
+  return kind === "datapack" ? manifest.datapacks : manifest.mods;
+}
+
+/** Convert a manifest resource map to a ModEntry array (like Rust's Manifest::mods_as_entries) */
+export function modsAsEntries(manifest: Manifest, kind: ResourceKind = "mod"): ModEntry[] {
   const knownProviders = knownProviderIds(manifest);
   const entries: ModEntry[] = [];
-  for (const [rawKey, version] of manifest.mods) {
+  for (const [rawKey, version] of resourceMap(manifest, kind)) {
     const disabled = rawKey.startsWith(DISABLED_PREFIX);
     const key = disabled ? rawKey.slice(DISABLED_PREFIX.length) : rawKey;
 
@@ -146,40 +158,48 @@ export function manifestKeyForEntry(entry: ModEntry): string {
   return entry.disabled ? `${DISABLED_PREFIX}${key}` : key;
 }
 
-/** Insert a mod entry into the manifest (like Rust's Manifest::insert_mod_entry) */
-export function insertModEntry(manifest: Manifest, entry: ModEntry): void {
+/** Insert a mod/datapack entry into the manifest (like Rust's Manifest::insert_mod_entry) */
+export function insertModEntry(manifest: Manifest, entry: ModEntry, kind: ResourceKind = "mod"): void {
   const key = manifestKeyForEntry(entry);
-  manifest.mods.set(key, entry.version);
+  resourceMap(manifest, kind).set(key, entry.version);
 }
 
-/** Disable a mod entry in place (moves it under the disabled prefix). No-op if already disabled or missing. */
-export function disableModEntry(manifest: Manifest, entry: ModEntry): boolean {
+/** Disable an entry in place (moves it under the disabled prefix). No-op if already disabled or missing. */
+export function disableModEntry(manifest: Manifest, entry: ModEntry, kind: ResourceKind = "mod"): boolean {
   if (entry.disabled) return false;
   const key = modEntryToKey(entry);
-  const version = manifest.mods.get(key);
+  const map = resourceMap(manifest, kind);
+  const version = map.get(key);
   if (version === undefined) return false;
-  manifest.mods.delete(key);
-  manifest.mods.set(`${DISABLED_PREFIX}${key}`, version);
+  map.delete(key);
+  map.set(`${DISABLED_PREFIX}${key}`, version);
   return true;
 }
 
-/** Enable a mod entry in place (moves it out of the disabled prefix). No-op if already enabled or missing. */
-export function enableModEntry(manifest: Manifest, entry: ModEntry): boolean {
+/** Enable an entry in place (moves it out of the disabled prefix). No-op if already enabled or missing. */
+export function enableModEntry(manifest: Manifest, entry: ModEntry, kind: ResourceKind = "mod"): boolean {
   if (!entry.disabled) return false;
   const key = modEntryToKey(entry);
   const disabledKey = `${DISABLED_PREFIX}${key}`;
-  const version = manifest.mods.get(disabledKey);
+  const map = resourceMap(manifest, kind);
+  const version = map.get(disabledKey);
   if (version === undefined) return false;
-  manifest.mods.delete(disabledKey);
-  manifest.mods.set(key, version);
+  map.delete(disabledKey);
+  map.set(key, version);
   return true;
 }
 
-/** Remove a mod by provider and slug, returns true if removed (like Rust's Manifest::remove_mod_entry) */
-export function removeModEntry(manifest: Manifest, provider: string, slug: string): boolean {
+/** Remove an entry by provider and slug, returns true if removed (like Rust's Manifest::remove_mod_entry) */
+export function removeModEntry(
+  manifest: Manifest,
+  provider: string,
+  slug: string,
+  kind: ResourceKind = "mod",
+): boolean {
   const key = `${provider}:${slug}`;
   const disabledKey = `${DISABLED_PREFIX}${key}`;
-  const removed = manifest.mods.delete(key);
-  const removedDisabled = manifest.mods.delete(disabledKey);
+  const map = resourceMap(manifest, kind);
+  const removed = map.delete(key);
+  const removedDisabled = map.delete(disabledKey);
   return removed || removedDisabled;
 }

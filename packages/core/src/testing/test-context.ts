@@ -1,9 +1,9 @@
-import { mkdtempSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
-import type { Config, ConfigPaths } from "../models/config.js";
-import { configPaths } from "../models/config.js";
-import { QuietIO } from "./quiet-io.js";
+import {mkdirSync, mkdtempSync, rmSync} from "fs";
+import {join} from "path";
+import {tmpdir} from "os";
+import type {Config, ConfigPaths} from "../models/config.js";
+import {configPaths} from "../models/config.js";
+import {QuietIO} from "./quiet-io.js";
 
 /** Test isolation helper — creates temp dirs and provides config/io instances */
 export class TestContext {
@@ -17,8 +17,10 @@ export class TestContext {
 
     const cacheDir = join(this.root, "cache");
     const modsDir = join(this.root, "mods");
+    const datapacksDir = join(this.root, "datapacks");
     mkdirSync(cacheDir, { recursive: true });
     mkdirSync(modsDir, { recursive: true });
+    mkdirSync(datapacksDir, { recursive: true });
 
     this.config = Object.freeze({
       verbose: false,
@@ -27,6 +29,7 @@ export class TestContext {
       projectDir: this.root,
       outputDir: this.root,
       modsDir,
+      datapacksDir,
       modrinthToken: undefined,
     });
 

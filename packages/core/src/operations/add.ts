@@ -1,7 +1,7 @@
 // Add operation ported from src-tauri/src/app/modules/core/add.rs
 
 import type {ModManager} from "./mod-manager.js";
-import type {Provider, VersionSpec} from "../models/manifest.js";
+import type {Provider, ResourceKind, VersionSpec} from "../models/manifest.js";
 import {insertModEntry, isSemverRange} from "../models/manifest.js";
 import type {VersionResult} from "../models/repository.js";
 import {asStr} from "../helpers/utils.js";
@@ -22,12 +22,14 @@ export interface AddOptions {
   /** Callback to select a version. If not provided, uses first version. */
   versionPicker?: (versions: VersionResult[]) => Promise<number>;
   search: boolean;
+  kind?: ResourceKind;
 }
 
 export class Add {
   static async run(manager: ModManager, options: AddOptions): Promise<void> {
     await manager.load();
 
+    const kind = options.kind ?? "mod";
     const provider = options.provider ?? manager.manifestService.manifest.default_provider;
 
     const project = options.search
@@ -38,7 +40,7 @@ export class Add {
     const versions = await manager.repoService.getVersions(
       `${provider}:${project.id}`,
       [manager.manifestService.manifest.minecraft_version],
-      [asStr(manager.manifestService.manifest.modloader)],
+      kind === "datapack" ? ["datapack"] : [asStr(manager.manifestService.manifest.modloader)],
       options.version,
     );
 
@@ -73,9 +75,9 @@ export class Add {
       provider,
     };
 
-    insertModEntry(manager.manifestService.manifest, entry);
+    insertModEntry(manager.manifestService.manifest, entry, kind);
 
-    await manager.refreshMod(entry, versions, false, false);
+    await manager.refreshMod(entry, versions, false, false, kind);
     manager.saveAll();
   }
 

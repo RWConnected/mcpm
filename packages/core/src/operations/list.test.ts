@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory,
-  FakeDownloadService,
-} from "../testing/index.js";
-import { ModManager } from "./mod-manager.js";
-import { List } from "./list.js";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import {FakeDownloadService, LockfileFactory, ManifestFactory, ModFactory, TestContext,} from "../testing/index.js";
+import {ModManager} from "./mod-manager.js";
+import {List} from "./list.js";
 
 function createManager(ctx: TestContext): ModManager {
   return new ModManager({
@@ -48,5 +45,24 @@ describe("List", () => {
     const prints = ctx.io.messages.filter((m) => m.level === "print").map((m) => m.msg);
     expect(prints.some((m) => m.includes("modrinth:sodium"))).toBe(true);
     expect(prints.some((m) => m.includes("modrinth:lithium"))).toBe(true);
+  });
+
+  it("lists mods and datapacks in separate sections", async () => {
+    const mod = ModFactory.create("modrinth:sodium", "0.6.0");
+    const datapack = ModFactory.create("modrinth:vanilla-tweaks", "1.0.0", "datapack");
+    ManifestFactory.create("1.21.11").withMod(mod).withDatapack(datapack).writeTo(ctx.paths);
+    LockfileFactory.create().writeTo(ctx.paths);
+
+    const manager = createManager(ctx);
+    await manager.load();
+
+    await List.run(manager);
+
+    const infos = ctx.io.messages.filter((m) => m.level === "info").map((m) => m.msg);
+    const prints = ctx.io.messages.filter((m) => m.level === "print").map((m) => m.msg);
+    expect(infos.some((m) => m.includes("Installed mods"))).toBe(true);
+    expect(infos.some((m) => m.includes("Installed datapacks"))).toBe(true);
+    expect(prints.some((m) => m.includes("modrinth:sodium"))).toBe(true);
+    expect(prints.some((m) => m.includes("modrinth:vanilla-tweaks"))).toBe(true);
   });
 });

@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory,
-  FakeDownloadService,
-} from "../testing/index.js";
-import { ModManager } from "./mod-manager.js";
-import { Remove } from "./remove.js";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import {FakeDownloadService, LockfileFactory, ManifestFactory, ModFactory, TestContext,} from "../testing/index.js";
+import {ModManager} from "./mod-manager.js";
+import {Remove} from "./remove.js";
 
 function createManager(ctx: TestContext): ModManager {
   return new ModManager({
@@ -86,5 +83,22 @@ describe("Remove", () => {
     expect(manager.manifestService.manifest.mods.has("modrinth:b")).toBe(true);
     expect(manager.lockService.lock.mods.has("modrinth:a")).toBe(false);
     expect(manager.lockService.lock.mods.has("modrinth:b")).toBe(true);
+  });
+
+  it("removes a datapack from the manifest's datapacks map, leaving mods untouched", async () => {
+    const mod = ModFactory.create("modrinth:sodium", "0.6.0");
+    const datapack = ModFactory.create("modrinth:vanilla-tweaks", "1.0.0", "datapack");
+    ManifestFactory.create("1.21.11").withMod(mod).withDatapack(datapack).writeTo(ctx.paths);
+    LockfileFactory.create().withMod(mod).withDatapack(datapack).writeTo(ctx.paths);
+
+    const manager = createManager(ctx);
+    await manager.load();
+
+    const warning = await Remove.run(manager, "vanilla-tweaks", undefined, "datapack");
+
+    expect(warning).toBeUndefined();
+    expect(manager.manifestService.manifest.datapacks.has("modrinth:vanilla-tweaks")).toBe(false);
+    expect(manager.lockService.lock.datapacks.has("modrinth:vanilla-tweaks")).toBe(false);
+    expect(manager.manifestService.manifest.mods.has("modrinth:sodium")).toBe(true);
   });
 });

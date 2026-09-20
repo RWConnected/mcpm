@@ -2,12 +2,13 @@
 
 // Models
 export type {
-  Side, ModLoader, Provider, VersionSpec, ModEntry, Manifest, PartialManifest,
+  Side, ModLoader, Provider, ResourceKind, VersionSpec, ModEntry, Manifest, PartialManifest,
 } from "./models/manifest.js";
 export {
   isSemverRange, versionSpecFromString, versionSpecToString,
-  defaultManifest, mergeManifest, modsAsEntries, modEntryToKey,
-  insertModEntry, removeModEntry, knownProviderIds, RESERVED_PROVIDER_IDS,
+  defaultManifest, mergeManifest, modsAsEntries, modEntryToKey, resourceMap,
+  insertModEntry, removeModEntry, disableModEntry, enableModEntry,
+  knownProviderIds, RESERVED_PROVIDER_IDS,
 } from "./models/manifest.js";
 
 export type {

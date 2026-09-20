@@ -5,8 +5,14 @@ import type {ConfigPaths} from "../models/config.js";
 import type {IO} from "../io/io.types.js";
 import type {LockEntry, LockFile} from "../models/lockfile.js";
 import {emptyLockFile} from "../models/lockfile.js";
-import type {Manifest, ModEntry, VersionSpec} from "../models/manifest.js";
-import {manifestKeyForEntry, modEntryToKey, modsAsEntries, versionSpecToString} from "../models/manifest.js";
+import type {Manifest, ModEntry, ResourceKind, VersionSpec} from "../models/manifest.js";
+import {
+  manifestKeyForEntry,
+  modEntryToKey,
+  modsAsEntries,
+  resourceMap,
+  versionSpecToString
+} from "../models/manifest.js";
 import type {VersionResult} from "../models/repository.js";
 import type {RepositoryService} from "../repositories/repository-service.js";
 import {asStr} from "../helpers/utils.js";
@@ -37,24 +43,29 @@ export class LockService {
           mods.set(key, value as LockEntry);
         }
       }
-      this.lock = { mods };
+      const datapacks = new Map<string, LockEntry>();
+      if (raw.datapacks && typeof raw.datapacks === "object") {
+        for (const [key, value] of Object.entries(raw.datapacks)) {
+          datapacks.set(key, value as LockEntry);
+        }
+      }
+      this.lock = { mods, datapacks };
     } catch {
       this.lock = emptyLockFile();
     }
   }
 
-  /** Save lockfile to disk, sorting mods alphabetically by key */
+  /** Save lockfile to disk, sorting each list alphabetically by key */
   save(): void {
-    const sortedKeys = [...this.lock.mods.keys()].sort();
-    const sortedMods: Record<string, LockEntry> = {};
-    for (const key of sortedKeys) {
-      sortedMods[key] = this.lock.mods.get(key)!;
-    }
-    const json = JSON.stringify({ mods: sortedMods }, null, 2);
+    const json = JSON.stringify(
+      { mods: sortedRecord(this.lock.mods), datapacks: sortedRecord(this.lock.datapacks) },
+      null,
+      2,
+    );
     writeFileSync(this.paths.lockPath, json);
   }
 
-  /** Update a lock entry for a manifest mod. Returns true on success. */
+  /** Update a lock entry for a manifest mod/datapack. Returns true on success. */
   async updateEntry(
     manifestMod: ModEntry,
     manifest: Manifest,
@@ -62,9 +73,11 @@ export class LockService {
     available?: VersionResult[],
     upgrade = false,
     ignoreConstraints = false,
+    kind: ResourceKind = "mod",
   ): Promise<boolean> {
     const key = modEntryToKey(manifestMod);
-    const prev = this.lock.mods.get(key);
+    const lockMap = kind === "datapack" ? this.lock.datapacks : this.lock.mods;
+    const prev = lockMap.get(key);
 
     const versionOutdated = prev
       ? !satisfies(manifestMod.version, prev.version)
@@ -83,7 +96,7 @@ export class LockService {
       : await repoService.getVersions(
           projectId,
           [manifest.minecraft_version],
-          [asStr(manifest.modloader)],
+          kind === "datapack" ? ["datapack"] : [asStr(manifest.modloader)],
           wantedVersion,
         );
 
@@ -111,7 +124,7 @@ export class LockService {
     }
 
     if (resolved) {
-      this.lock.mods.set(key, {
+      lockMap.set(key, {
         id: resolved.modId,
         version: resolved.version,
         minecraft_versions: resolved.minecraftVersions,
@@ -121,12 +134,13 @@ export class LockService {
 
       if (upgrade) {
         const manifestKey = manifestKeyForEntry(manifestMod);
-        const currentSpec = manifest.mods.get(manifestKey);
+        const manifestMap = resourceMap(manifest, kind);
+        const currentSpec = manifestMap.get(manifestKey);
         if (currentSpec) {
           const newSpec: VersionSpec = currentSpec.kind === "exact"
             ? { kind: "exact", value: resolved.version }
             : { kind: "range", value: `^${resolved.version}` };
-          manifest.mods.set(manifestKey, newSpec);
+          manifestMap.set(manifestKey, newSpec);
         }
       }
     } else {
@@ -138,24 +152,34 @@ export class LockService {
     return true;
   }
 
-  /** Remove lock entries not present in manifest. Returns set of removed keys. */
+  /** Remove lock entries not present in the manifest. Returns set of removed keys (mods + datapacks). */
   prune(manifest: Manifest): Set<string> {
-    const manifestKeys = new Set(modsAsEntries(manifest).map((e) => modEntryToKey(e)));
     const removed = new Set<string>();
-
-    for (const key of this.lock.mods.keys()) {
-      if (!manifestKeys.has(key)) {
-        this.lock.mods.delete(key);
-        removed.add(key);
+    for (const kind of ["mod", "datapack"] as const) {
+      const manifestKeys = new Set(modsAsEntries(manifest, kind).map((e) => modEntryToKey(e)));
+      const lockMap = kind === "datapack" ? this.lock.datapacks : this.lock.mods;
+      for (const key of lockMap.keys()) {
+        if (!manifestKeys.has(key)) {
+          lockMap.delete(key);
+          removed.add(key);
+        }
       }
     }
-
     return removed;
   }
 
-  /** Get the resolved version for a manifest mod entry */
-  getVersion(manifestMod: ModEntry): string | undefined {
+  /** Get the resolved version for a manifest mod/datapack entry */
+  getVersion(manifestMod: ModEntry, kind: ResourceKind = "mod"): string | undefined {
     const key = modEntryToKey(manifestMod);
-    return this.lock.mods.get(key)?.version;
+    const lockMap = kind === "datapack" ? this.lock.datapacks : this.lock.mods;
+    return lockMap.get(key)?.version;
   }
+}
+
+function sortedRecord(map: Map<string, LockEntry>): Record<string, LockEntry> {
+  const sorted: Record<string, LockEntry> = {};
+  for (const key of [...map.keys()].sort()) {
+    sorted[key] = map.get(key)!;
+  }
+  return sorted;
 }

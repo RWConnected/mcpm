@@ -19,11 +19,13 @@ export class Upgrade {
     disableUnresolved = false,
     enableResolved = false,
   ): Promise<UpgradeResult> {
-    const allMods = manager.manifestModEntries();
+    const allEntries = (["mod", "datapack"] as const).flatMap((kind) =>
+      manager.manifestEntries(kind).map((entry) => ({ entry, kind })),
+    );
 
     const toUpgrade = mods.length === 0
-      ? allMods
-      : allMods.filter((m) => mods.some((q) => m.slug.includes(q)));
+      ? allEntries
+      : allEntries.filter(({ entry }) => mods.some((q) => entry.slug.includes(q)));
 
     if (toUpgrade.length === 0) {
       throw new Error("No matching mods found to upgrade");
@@ -31,17 +33,17 @@ export class Upgrade {
 
     // Snapshot current versions
     const beforeVersions = new Map<string, string>();
-    for (const entry of toUpgrade) {
+    for (const { entry, kind } of toUpgrade) {
       const key = modEntryToKey(entry);
-      const v = manager.lockService.getVersion(entry);
+      const v = manager.lockService.getVersion(entry, kind);
       if (v) beforeVersions.set(key, v);
     }
 
-    // Refresh each mod with upgrade=true
+    // Refresh each mod/datapack with upgrade=true
     const disabled: string[] = [];
     const stillUnresolved: string[] = [];
     const enabled: string[] = [];
-    for (const entry of toUpgrade) {
+    for (const { entry, kind } of toUpgrade) {
       const success = await manager.lockService.updateEntry(
         entry,
         manager.manifestService.manifest,
@@ -49,6 +51,7 @@ export class Upgrade {
         undefined,
         true,
         ignoreConstraints,
+        kind,
       );
 
       if (!success) {
@@ -61,14 +64,14 @@ export class Upgrade {
         if (!disableUnresolved) {
           throw new Error(`Failed to update ${entry.slug}`);
         }
-        if (disableModEntry(manager.manifestService.manifest, entry)) {
+        if (disableModEntry(manager.manifestService.manifest, entry, kind)) {
           disabled.push(modEntryToKey(entry));
         }
         continue;
       }
 
       if (entry.disabled && enableResolved) {
-        if (enableModEntry(manager.manifestService.manifest, entry)) {
+        if (enableModEntry(manager.manifestService.manifest, entry, kind)) {
           enabled.push(modEntryToKey(entry));
         }
       }
@@ -81,12 +84,12 @@ export class Upgrade {
     const skipKeys = new Set([...disabled, ...stillUnresolved]);
     let unchanged = 0;
 
-    for (const entry of toUpgrade) {
+    for (const { entry, kind } of toUpgrade) {
       const key = modEntryToKey(entry);
       if (skipKeys.has(key)) continue;
 
       const before = beforeVersions.get(key);
-      const after = manager.lockService.getVersion(entry);
+      const after = manager.lockService.getVersion(entry, kind);
 
       if (before !== after) {
         upgraded.push([key, before, after]);

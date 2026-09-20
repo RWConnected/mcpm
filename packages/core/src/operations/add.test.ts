@@ -174,4 +174,25 @@ describe("Add", () => {
     expect(repo.findWasCalled).toBe(false);
     expect(manager.manifestService.manifest.mods.has("modrinth:gui-shop")).toBe(true);
   });
+
+  it("adds a datapack to the manifest's datapacks map, not mods", async () => {
+    const datapack = ModFactory.create("vanilla-tweaks", "1.0.0", "datapack");
+    ManifestFactory.create("1.21.11").writeTo(ctx.paths);
+    LockfileFactory.create().writeTo(ctx.paths);
+
+    const repo = new FindableFakeRepository()
+      .withVersion(datapack)
+      .withFindResult({
+        id: "vanilla-tweaks", slug: "vanilla-tweaks", name: "Vanilla Tweaks",
+        description: "", source: "Modrinth", side: "both", url: "",
+      });
+
+    const manager = createManager(ctx, repo);
+
+    await Add.run(manager, { id: "vanilla-tweaks", search: false, exact: true, kind: "datapack" });
+
+    expect(manager.manifestService.manifest.datapacks.has("modrinth:vanilla-tweaks")).toBe(true);
+    expect(manager.manifestService.manifest.mods.has("modrinth:vanilla-tweaks")).toBe(false);
+    expect(manager.lockService.lock.datapacks.has("modrinth:vanilla-tweaks")).toBe(true);
+  });
 });

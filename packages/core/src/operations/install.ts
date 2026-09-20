@@ -4,7 +4,7 @@ import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSy
 import {join} from "path";
 import {createHash} from "crypto";
 import type {ModManager} from "./mod-manager.js";
-import {modEntryToKey} from "../models/manifest.js";
+import {modEntryToKey, type ResourceKind} from "../models/manifest.js";
 
 export class Install {
   static async runWithManager(
@@ -12,14 +12,11 @@ export class Install {
     noCache: boolean,
     forceRehash: boolean,
   ): Promise<void> {
-    const mods = manager.manifestModEntries();
-    const disabledKeys = new Set(
-      mods.filter((m) => m.disabled).map((m) => modEntryToKey(m)),
-    );
-
-    // 1. Refresh all manifest mods (update lock), disabled ones included
-    for (const entry of mods) {
-      await manager.refreshMod(entry, undefined, false, false);
+    // 1. Refresh all manifest mods + datapacks (update lock), disabled ones included
+    for (const kind of ["mod", "datapack"] as const) {
+      for (const entry of manager.manifestEntries(kind)) {
+        await manager.refreshMod(entry, undefined, false, false, kind);
+      }
     }
 
     // 2. Prune lock (remove unreferenced)
@@ -28,20 +25,35 @@ export class Install {
     // 3. Save manifest + lock
     manager.saveAll();
 
-    const cacheDir = manager.config.cacheDir;
-    const modsDir = manager.config.modsDir;
-    mkdirSync(cacheDir, { recursive: true });
-    mkdirSync(modsDir, { recursive: true });
+    await Install.installResource(manager, "mod", manager.config.modsDir, "jar", noCache, forceRehash);
+    await Install.installResource(manager, "datapack", manager.config.datapacksDir, "zip", noCache, forceRehash);
+  }
 
-    // 4. Hash-verify existing mods (unless force-rehash)
+  private static async installResource(
+    manager: ModManager,
+    kind: ResourceKind,
+    dir: string,
+    extension: string,
+    noCache: boolean,
+    forceRehash: boolean,
+  ): Promise<void> {
+    const entries = manager.manifestEntries(kind);
+    const disabledKeys = new Set(entries.filter((m) => m.disabled).map((m) => modEntryToKey(m)));
+    const lockMap = kind === "datapack" ? manager.lockService.lock.datapacks : manager.lockService.lock.mods;
+
+    const cacheDir = manager.config.cacheDir;
+    mkdirSync(cacheDir, { recursive: true });
+    mkdirSync(dir, { recursive: true });
+
+    // Hash-verify existing files (unless force-rehash)
     if (!forceRehash) {
-      for (const [key, entry] of manager.lockService.lock.mods) {
+      for (const [key, entry] of lockMap) {
         if (disabledKeys.has(key)) continue;
-        const fileName = `${key}-${entry.version}.jar`;
-        const modPath = join(modsDir, fileName);
+        const fileName = `${key}-${entry.version}.${extension}`;
+        const targetPath = join(dir, fileName);
         const cachePath = join(cacheDir, fileName);
 
-        for (const p of [modPath, cachePath]) {
+        for (const p of [targetPath, cachePath]) {
           if (existsSync(p) && !verifyFileHash(p, entry.hash)) {
             throw new Error(
               `Hash mismatch for ${key}. Re-run with --force-rehash to continue.`,
@@ -51,15 +63,15 @@ export class Install {
       }
     }
 
-    // 5. Download mods
-    const expectedModFiles: string[] = [];
+    // Download files
+    const expectedFiles: string[] = [];
 
-    for (const [key, entry] of manager.lockService.lock.mods) {
+    for (const [key, entry] of lockMap) {
       if (disabledKeys.has(key)) continue;
-      const fileName = `${key}-${entry.version}.jar`;
-      const targetPath = join(modsDir, fileName);
+      const fileName = `${key}-${entry.version}.${extension}`;
+      const targetPath = join(dir, fileName);
       const cachePath = join(cacheDir, fileName);
-      expectedModFiles.push(targetPath);
+      expectedFiles.push(targetPath);
 
       const dest = noCache ? targetPath : cachePath;
       if (!existsSync(dest) || forceRehash) {
@@ -74,12 +86,12 @@ export class Install {
       }
     }
 
-    // 6. Remove outdated mod files
-    const entries = readdirSync(modsDir, { withFileTypes: true });
-    for (const dirent of entries) {
+    // Remove outdated files
+    const dirents = readdirSync(dir, { withFileTypes: true });
+    for (const dirent of dirents) {
       if (dirent.isFile()) {
-        const fullPath = join(modsDir, dirent.name);
-        if (!expectedModFiles.includes(fullPath)) {
+        const fullPath = join(dir, dirent.name);
+        if (!expectedFiles.includes(fullPath)) {
           unlinkSync(fullPath);
         }
       }

@@ -1,14 +1,14 @@
 // ModManager ported from src-tauri/src/app/modules/core/ops/manager.rs
 
-import type { Config, ConfigPaths } from "../models/config.js";
-import type { IO } from "../io/io.types.js";
-import type { DownloadService } from "../download/download-service.interface.js";
-import type { ModEntry } from "../models/manifest.js";
-import type { VersionResult } from "../models/repository.js";
-import { modsAsEntries } from "../models/manifest.js";
-import { ManifestService } from "../services/manifest-service.js";
-import { LockService } from "../services/lock-service.js";
-import { RepositoryService } from "../repositories/repository-service.js";
+import type {Config, ConfigPaths} from "../models/config.js";
+import type {IO} from "../io/io.types.js";
+import type {DownloadService} from "../download/download-service.interface.js";
+import type {ModEntry, ResourceKind} from "../models/manifest.js";
+import {modsAsEntries} from "../models/manifest.js";
+import type {VersionResult} from "../models/repository.js";
+import {ManifestService} from "../services/manifest-service.js";
+import {LockService} from "../services/lock-service.js";
+import {RepositoryService} from "../repositories/repository-service.js";
 
 export interface ModManagerDeps {
   config: Config;
@@ -44,11 +44,16 @@ export class ModManager {
     return modsAsEntries(this.manifestService.manifest);
   }
 
+  manifestEntries(kind: ResourceKind = "mod"): ModEntry[] {
+    return modsAsEntries(this.manifestService.manifest, kind);
+  }
+
   async refreshMod(
     entry: ModEntry,
     available?: VersionResult[],
     upgrade = false,
     ignoreConstraints = false,
+    kind: ResourceKind = "mod",
   ): Promise<void> {
     const success = await this.lockService.updateEntry(
       entry,
@@ -57,6 +62,7 @@ export class ModManager {
       available,
       upgrade,
       ignoreConstraints,
+      kind,
     );
     if (!success) {
       throw new Error(`Failed to update ${entry.slug}`);

@@ -10,8 +10,9 @@ export interface LockEntry {
 
 export interface LockFile {
   mods: Map<string, LockEntry>;
+  datapacks: Map<string, LockEntry>;
 }
 
 export function emptyLockFile(): LockFile {
-  return { mods: new Map() };
+  return { mods: new Map(), datapacks: new Map() };
 }

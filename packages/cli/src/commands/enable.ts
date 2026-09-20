@@ -4,23 +4,25 @@ import {Enable, type ModManager, type Provider} from "@mcpm/core";
 export function registerEnable(program: Command, getManager: () => Promise<ModManager>): void {
   program
     .command("enable")
-    .description("Re-enable a previously disabled mod")
-    .argument("<slug>", "Mod slug")
+    .description("Re-enable a previously disabled mod or datapack")
+    .argument("<slug>", "Mod/datapack slug")
     .argument("[provider]", "Provider (modrinth, curseforge, etc.)")
-    .action(async (slug: string, provider: string | undefined) => {
+    .option("--type <type>", "Resource type: mod or datapack", "mod")
+    .action(async (slug: string, provider: string | undefined, opts) => {
       const manager = await getManager();
       const io = manager.io;
+      const kind = opts.type === "datapack" ? "datapack" : "mod";
       try {
-        const outcome = await Enable.run(manager, slug, provider as Provider | undefined);
+        const outcome = await Enable.run(manager, slug, provider as Provider | undefined, kind);
         switch (outcome) {
           case "enabled":
-            io.success(`Enabled mod '${slug}'. Run 'mcpm install' to download it into your mods folder.`);
+            io.success(`Enabled ${kind} '${slug}'. Run 'mcpm install' to download it into your ${kind === "datapack" ? "datapacks" : "mods"} folder.`);
             break;
           case "already-enabled":
-            io.info(`Mod '${slug}' is already enabled`);
+            io.info(`${kind === "datapack" ? "Datapack" : "Mod"} '${slug}' is already enabled`);
             break;
           case "not-found":
-            io.warn(`Mod '${slug}' not found in manifest`);
+            io.warn(`${kind === "datapack" ? "Datapack" : "Mod"} '${slug}' not found in manifest`);
             break;
         }
       } catch (e) {

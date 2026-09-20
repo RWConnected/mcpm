@@ -14,7 +14,7 @@ import {
 } from "../models/manifest.js";
 import {type ProviderConfig, validateProviders} from "../models/provider-config.js";
 
-const RECOMMENDED_IGNORES = ["mods/", "crash-reports/", "logs/", "saves/"];
+const RECOMMENDED_IGNORES = ["mods/", "datapacks/", "crash-reports/", "logs/", "saves/"];
 
 export class ManifestService {
   manifest: Manifest;
@@ -39,9 +39,16 @@ export class ManifestService {
       }
     }
 
+    const datapacks = new Map<string, VersionSpec>();
+    if (raw.datapacks && typeof raw.datapacks === "object") {
+      for (const [key, value] of Object.entries(raw.datapacks)) {
+        datapacks.set(key, versionSpecFromString(value as string));
+      }
+    }
+
     const providers: ProviderConfig[] | undefined = Array.isArray(raw.providers) ? raw.providers : undefined;
 
-    const partial: PartialManifest = { ...raw, mods, providers };
+    const partial: PartialManifest = { ...raw, mods, datapacks, providers };
     this.manifest = mergeManifest(partial);
 
     const { invalid } = validateProviders(this.manifest.providers);
@@ -92,6 +99,11 @@ export class ManifestService {
       modsObj[key] = versionSpecToString(spec);
     }
 
+    const datapacksObj: Record<string, string> = {};
+    for (const [key, spec] of this.manifest.datapacks) {
+      datapacksObj[key] = versionSpecToString(spec);
+    }
+
     const obj: Record<string, unknown> = {
       name: this.manifest.name,
       version: this.manifest.version,
@@ -103,6 +115,7 @@ export class ManifestService {
     obj.minecraft_version = this.manifest.minecraft_version;
     obj.default_provider = this.manifest.default_provider;
     obj.mods = modsObj;
+    obj.datapacks = datapacksObj;
     if (this.manifest.license !== undefined) obj.license = this.manifest.license;
     if (this.manifest.homepage !== undefined) obj.homepage = this.manifest.homepage;
     if (this.manifest.tags !== undefined) obj.tags = this.manifest.tags;

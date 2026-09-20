@@ -4,8 +4,8 @@ import {type ModManager, Outdated} from "@mcpm/core";
 export function registerOutdated(program: Command, getManager: () => Promise<ModManager>): void {
   program
     .command("outdated")
-    .description("Check for outdated mods")
-    .argument("[mods...]", "Mods to check (id, slug or substring)")
+    .description("Check for outdated mods and datapacks")
+    .argument("[mods...]", "Mods/datapacks to check (id, slug or substring)")
     .action(async (mods: string[]) => {
       const manager = await getManager();
       const io = manager.io;
@@ -13,20 +13,20 @@ export function registerOutdated(program: Command, getManager: () => Promise<Mod
         const result = await Outdated.run(manager, mods);
 
         if (result.outdated.length === 0) {
-          io.success("All mods are up to date");
+          io.success("All mods and datapacks are up to date");
           return;
         }
 
-        io.info(`Found ${result.outdated.length} outdated mod(s):\n`);
+        io.info(`Found ${result.outdated.length} outdated item(s):\n`);
         console.log(
-          `| ${"Mod".padEnd(30)} | ${"Current".padEnd(20)} | ${"Wanted".padEnd(20)} | ${"Latest".padEnd(20)} |`,
+          `| ${"Name".padEnd(30)} | ${"Type".padEnd(9)} | ${"Current".padEnd(20)} | ${"Wanted".padEnd(20)} | ${"Latest".padEnd(20)} |`,
         );
-        console.log("-".repeat(103));
+        console.log("-".repeat(115));
 
         for (const entry of result.outdated) {
           const label = entry.disabled ? `${entry.key} (disabled)` : entry.key;
           console.log(
-            `| ${label.padEnd(30)} | ${entry.current.padEnd(20)} | ${(entry.wanted ?? "-").padEnd(20)} | ${(entry.latest ?? "-").padEnd(20)} |`,
+            `| ${label.padEnd(30)} | ${entry.kind.padEnd(9)} | ${entry.current.padEnd(20)} | ${(entry.wanted ?? "-").padEnd(20)} | ${(entry.latest ?? "-").padEnd(20)} |`,
           );
         }
 
@@ -36,7 +36,7 @@ export function registerOutdated(program: Command, getManager: () => Promise<Mod
           );
         }
 
-        console.log(`\nChecked ${result.totalChecked} mods total`);
+        console.log(`\nChecked ${result.totalChecked} item(s) total`);
       } catch (e) {
         io.error(e instanceof Error ? e.message : String(e));
         process.exit(1);

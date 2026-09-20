@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { resolveConfig, configPaths } from "./config.js";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import {configPaths, resolveConfig} from "./config.js";
 
 describe("resolveConfig", () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -11,6 +11,7 @@ describe("resolveConfig", () => {
       "MCPM_CACHE_DIR",
       "MCPM_OUTPUT_DIR",
       "MCPM_MODS_DIR",
+      "MCPM_DATAPACKS_DIR",
       "MCPM_MODRINTH_TOKEN",
     ]) {
       savedEnv[key] = process.env[key];
@@ -80,6 +81,25 @@ describe("resolveConfig", () => {
       outputDir: "/my/output",
     });
     expect(config.modsDir).toBe("/my/output/mods");
+  });
+
+  it("resolves datapacks dir relative to output dir by default", () => {
+    const config = resolveConfig({
+      projectDir: "/my/project",
+      outputDir: "/my/output",
+    });
+    expect(config.datapacksDir).toBe("/my/output/datapacks");
+  });
+
+  it("resolves datapacks dir from CLI option", () => {
+    const config = resolveConfig({ datapacksDir: "/custom/datapacks" });
+    expect(config.datapacksDir).toBe("/custom/datapacks");
+  });
+
+  it("resolves datapacks dir from env var", () => {
+    process.env.MCPM_DATAPACKS_DIR = "/env/datapacks";
+    const config = resolveConfig({});
+    expect(config.datapacksDir).toBe("/env/datapacks");
   });
 
   it("config is frozen (immutable)", () => {

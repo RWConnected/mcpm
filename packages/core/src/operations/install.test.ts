@@ -115,4 +115,47 @@ describe("Install", () => {
     // Lock entry is still refreshed/kept for update checks
     expect(manager.lockService.lock.mods.has("modrinth:sodium")).toBe(true);
   });
+
+  it("installs datapacks into datapacksDir, independent of mods", async () => {
+    const mcVersion = "1.21.11";
+    const mod = ModFactory.create("modrinth:sodium", "1.0.0");
+    const datapack = ModFactory.create("modrinth:vanilla-tweaks", "1.0.0", "datapack");
+
+    const repo = new FakeRepository().withVersion(mod).withVersion(datapack);
+    const dl = new FakeDownloadService().withMod(mod).withMod(datapack);
+    const manager = createManager(ctx, repo, dl);
+
+    LockfileFactory.create().withMod(mod).withDatapack(datapack).writeTo(ctx.paths);
+    ManifestFactory.create(mcVersion).withMod(mod).withDatapack(datapack).writeTo(ctx.paths);
+    await manager.load();
+
+    await Install.runWithManager(manager, false, false);
+
+    expect(existsSync(join(ctx.config.modsDir, mod.filename))).toBe(true);
+    expect(existsSync(join(ctx.config.datapacksDir, datapack.filename))).toBe(true);
+    expect(datapack.filename.endsWith(".zip")).toBe(true);
+    // Datapack file must not leak into the mods directory or vice versa
+    expect(existsSync(join(ctx.config.modsDir, datapack.filename))).toBe(false);
+    expect(existsSync(join(ctx.config.datapacksDir, mod.filename))).toBe(false);
+  });
+
+  it("removes a datapack file when it's removed from the manifest", async () => {
+    const mcVersion = "1.21.11";
+    const datapack = ModFactory.create("modrinth:vanilla-tweaks", "1.0.0", "datapack");
+    datapack.seedDatapack(ctx.config);
+
+    const repo = new FakeRepository().withVersion(datapack);
+    const dl = new FakeDownloadService().withMod(datapack);
+    const manager = createManager(ctx, repo, dl);
+
+    LockfileFactory.create().withDatapack(datapack).writeTo(ctx.paths);
+    ManifestFactory.create(mcVersion).writeTo(ctx.paths); // not in manifest
+    await manager.load();
+
+    await Install.runWithManager(manager, false, false);
+    manager.lockService.load();
+
+    expect(manager.lockService.lock.datapacks.has("modrinth:vanilla-tweaks")).toBe(false);
+    expect(existsSync(join(ctx.config.datapacksDir, datapack.filename))).toBe(false);
+  });
 });
