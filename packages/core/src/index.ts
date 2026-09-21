@@ -66,6 +66,8 @@ export { Disable } from "./operations/disable.js";
 export { Enable } from "./operations/enable.js";
 export { List } from "./operations/list.js";
 export { Init } from "./operations/init.js";
+export { ProviderInit, PROVIDER_TYPES } from "./operations/provider-init.js";
+export type { ProviderInitOptions, ProviderType } from "./operations/provider-init.js";
 export { Search } from "./operations/search.js";
 
 // Helpers
