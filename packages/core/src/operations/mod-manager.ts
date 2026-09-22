@@ -64,7 +64,7 @@ export class ModManager {
       ignoreConstraints,
       kind,
     );
-    if (!success) {
+    if (!success && !entry.disabled) {
       throw new Error(`Failed to update ${entry.slug}`);
     }
   }

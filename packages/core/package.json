@@ -11,6 +11,7 @@
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
+    "jszip": "^3.10.2",
     "semver": "^7.6.0"
   },
   "devDependencies": {

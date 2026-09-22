@@ -116,6 +116,30 @@ describe("Install", () => {
     expect(manager.lockService.lock.mods.has("modrinth:sodium")).toBe(true);
   });
 
+  it("does not abort install when a disabled mod has no compatible version", async () => {
+    const mcVersion = "1.21.11";
+    const disabledMod = ModFactory.create("modrinth:old-mod", "1.0.0").forMcVersions(["1.18.0"]);
+    const okMod = ModFactory.create("modrinth:sodium", "1.0.0");
+
+    const repo = new FakeRepository().withVersion(disabledMod);
+    const dl = new FakeDownloadService().withMod(disabledMod).withMod(okMod);
+    const manager = createManager(ctx, repo, dl);
+
+    LockfileFactory.create().withMod(okMod).writeTo(ctx.paths);
+    ManifestFactory.create(mcVersion).withMod(disabledMod).withMod(okMod).writeTo(ctx.paths);
+    await manager.load();
+
+    // Disable it directly on the loaded manifest, as `Disable.run` would.
+    const spec = manager.manifestService.manifest.mods.get("modrinth:old-mod")!;
+    manager.manifestService.manifest.mods.delete("modrinth:old-mod");
+    manager.manifestService.manifest.mods.set("disabled:modrinth:old-mod", spec);
+
+    await expect(Install.runWithManager(manager, false, false)).resolves.toBeUndefined();
+
+    expect(existsSync(join(ctx.config.modsDir, okMod.filename))).toBe(true);
+    expect(manager.lockService.lock.mods.has("modrinth:old-mod")).toBe(false);
+  });
+
   it("installs datapacks into datapacksDir, independent of mods", async () => {
     const mcVersion = "1.21.11";
     const mod = ModFactory.create("modrinth:sodium", "1.0.0");

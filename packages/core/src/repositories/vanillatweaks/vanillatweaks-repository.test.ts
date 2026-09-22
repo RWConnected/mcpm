@@ -29,7 +29,7 @@ describe("VanillaTweaksRepository", () => {
     expect(versions).toEqual([]);
   });
 
-  it("POSTs the datapacks selection wrapped as dpcategories, then downloads and hashes the zip", async () => {
+  it("POSTs the datapacks selection form-urlencoded as version+packs, then downloads and hashes the zip", async () => {
     const zipBytes = "zip-bytes";
     const calls: { url: string; init?: RequestInit }[] = [];
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -49,10 +49,10 @@ describe("VanillaTweaksRepository", () => {
     const versions = await repo.getVersions("core", ["1.21"], [], "1.21");
 
     expect(calls[0]?.url).toBe("https://vanillatweaks.net/assets/server/zipdatapacks.php");
-    expect(JSON.parse(calls[0]?.init?.body as string)).toEqual({
-      version: "1.21",
-      dpcategories: { qol: ["armor statues"] },
-    });
+    expect(calls[0]?.init?.headers).toEqual({ "Content-Type": "application/x-www-form-urlencoded" });
+    const params = new URLSearchParams(calls[0]?.init?.body as string);
+    expect(params.get("version")).toBe("1.21");
+    expect(JSON.parse(params.get("packs")!)).toEqual({ qol: ["armor statues"] });
     expect(calls[1]?.url).toBe("https://vanillatweaks.net/download/abc.zip");
 
     expect(versions).toHaveLength(1);
@@ -61,7 +61,7 @@ describe("VanillaTweaksRepository", () => {
     expect(versions[0]?.url).toBe("https://vanillatweaks.net/download/abc.zip");
   });
 
-  it("POSTs the craftingtweaks selection wrapped as ctcategories", async () => {
+  it("POSTs the craftingtweaks selection to the craftingtweaks endpoint", async () => {
     const calls: string[] = [];
     globalThis.fetch = (async (url: string) => {
       calls.push(url);
@@ -94,7 +94,7 @@ describe("VanillaTweaksRepository", () => {
     expect(versions).toEqual([]);
   });
 
-  it("POSTs the resourcepacks selection wrapped as rpcategories, only when loaders signal resourcepack", async () => {
+  it("POSTs the resourcepacks selection to the resourcepacks endpoint, only when loaders signal resourcepack", async () => {
     const calls: string[] = [];
     globalThis.fetch = (async (url: string) => {
       calls.push(url);

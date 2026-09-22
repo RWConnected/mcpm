@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { readFileSync } from "fs";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import {readFileSync} from "fs";
 import {
-  TestContext, ModFactory, ManifestFactory, LockfileFactory,
   FakeDownloadService,
+  FakeRepository,
+  LockfileFactory,
+  ManifestFactory,
+  ModFactory,
+  TestContext,
 } from "../testing/index.js";
-import { ModManager } from "./mod-manager.js";
+import {ModManager} from "./mod-manager.js";
+import {RepositoryService} from "../repositories/repository-service.js";
 
 function createManager(ctx: TestContext): ModManager {
   return new ModManager({
@@ -70,5 +75,58 @@ describe("ModManager", () => {
     expect(zPos).toBeLessThan(aPos);
     expect(aPos).toBeLessThan(mPos);
     expect(mPos).toBeLessThan(iPos);
+  });
+
+  // Regression: a disabled entry with no compatible version must not abort install/upgrade —
+  // that's often *why* it's disabled. Mirrors the handling already in upgrade.ts.
+  it("refreshMod does not throw for a disabled entry that fails to resolve", async () => {
+    const mod = ModFactory.create("modrinth:sodium", "1.0.0").forMcVersions(["1.20.0"]);
+    ManifestFactory.create("1.21.11").withMod(mod).writeTo(ctx.paths);
+    LockfileFactory.create().writeTo(ctx.paths);
+
+    const repoService = new RepositoryService();
+    repoService.addProvider("modrinth", new FakeRepository().withVersion(mod));
+
+    const manager = new ModManager({
+      config: ctx.config,
+      paths: ctx.paths,
+      io: ctx.io,
+      downloadService: new FakeDownloadService(),
+      repositoryService: repoService,
+    });
+    await manager.load();
+
+    // Disable it directly on the loaded manifest, as `Disable.run` would.
+    const spec = manager.manifestService.manifest.mods.get("modrinth:sodium")!;
+    manager.manifestService.manifest.mods.delete("modrinth:sodium");
+    manager.manifestService.manifest.mods.set("disabled:modrinth:sodium", spec);
+
+    const [entry] = manager.manifestEntries("mod");
+    expect(entry?.disabled).toBe(true);
+
+    await expect(manager.refreshMod(entry!, undefined, false, false, "mod")).resolves.toBeUndefined();
+  });
+
+  it("refreshMod still throws for a non-disabled entry that fails to resolve", async () => {
+    const mod = ModFactory.create("modrinth:sodium", "1.0.0").forMcVersions(["1.20.0"]);
+    ManifestFactory.create("1.21.11").withMod(mod).writeTo(ctx.paths);
+    LockfileFactory.create().writeTo(ctx.paths);
+
+    const repoService = new RepositoryService();
+    repoService.addProvider("modrinth", new FakeRepository().withVersion(mod));
+
+    const manager = new ModManager({
+      config: ctx.config,
+      paths: ctx.paths,
+      io: ctx.io,
+      downloadService: new FakeDownloadService(),
+      repositoryService: repoService,
+    });
+    await manager.load();
+
+    const [entry] = manager.manifestEntries("mod");
+    expect(entry?.disabled).toBeFalsy();
+
+    await expect(manager.refreshMod(entry!, undefined, false, false, "mod")).rejects.toThrow("Failed to update");
   });
 });

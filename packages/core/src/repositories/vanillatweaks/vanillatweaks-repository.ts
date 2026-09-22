@@ -5,21 +5,19 @@ import type {VanillaTweaksProviderConfig, VanillaTweaksSelection} from "../../mo
 
 type BundleType = "datapacks" | "craftingtweaks" | "resourcepacks";
 
-/** Endpoint + request-body wrapper key VanillaTweaks' own site uses per bundle type.
- * Isolated here so a future change to their zip-builder API is a one-place fix. */
-const ENDPOINTS: Record<BundleType, { url: string; wrapperKey: string }> = {
-  datapacks: { url: "https://vanillatweaks.net/assets/server/zipdatapacks.php", wrapperKey: "dpcategories" },
-  craftingtweaks: { url: "https://vanillatweaks.net/assets/server/zipcraftingtweaks.php", wrapperKey: "ctcategories" },
-  resourcepacks: { url: "https://vanillatweaks.net/assets/server/zipresourcepacks.php", wrapperKey: "rpcategories" },
+/** Zip-builder endpoint VanillaTweaks' own site posts to per bundle type. Isolated here so a
+ * future change to their API is a one-place fix. */
+const ENDPOINT_URLS: Record<BundleType, string> = {
+  datapacks: "https://vanillatweaks.net/assets/server/zipdatapacks.php",
+  craftingtweaks: "https://vanillatweaks.net/assets/server/zipcraftingtweaks.php",
+  resourcepacks: "https://vanillatweaks.net/assets/server/zipresourcepacks.php",
 };
 
-/** Builds the request body VanillaTweaks' zip-builder endpoint expects for a given bundle type. */
-export function buildVanillaTweaksRequestBody(
-  bundleType: BundleType,
-  selection: VanillaTweaksSelection,
-  version: string,
-): string {
-  return JSON.stringify({ version, [ENDPOINTS[bundleType].wrapperKey]: selection });
+/** Builds the request body VanillaTweaks' zip-builder endpoint expects: form-urlencoded (not
+ * JSON) with a "version" field and a "packs" field holding the JSON-stringified selection —
+ * same field name for every bundle type, verified against the live endpoint. */
+export function buildVanillaTweaksRequestBody(selection: VanillaTweaksSelection, version: string): URLSearchParams {
+  return new URLSearchParams({ version, packs: JSON.stringify(selection) });
 }
 
 interface VanillaTweaksZipResponse {
@@ -53,12 +51,12 @@ export class VanillaTweaksRepository implements IRepository {
     if (!found) return [];
 
     try {
-      const { url } = ENDPOINTS[found.type];
-      const body = buildVanillaTweaksRequestBody(found.type, found.selection, wantedVersion);
+      const url = ENDPOINT_URLS[found.type];
+      const body = buildVanillaTweaksRequestBody(found.selection, wantedVersion);
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
       });
       if (!res.ok) return [];
 

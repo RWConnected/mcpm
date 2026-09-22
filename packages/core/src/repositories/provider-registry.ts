@@ -22,7 +22,7 @@ export function buildRepositoryService(manifest: Manifest, config: Config, io: I
   for (const providerConfig of valid) {
     switch (providerConfig.type) {
       case "local":
-        service.addProvider(providerConfig.id, new LocalRepository(providerConfig, config.projectDir));
+        service.addProvider(providerConfig.id, new LocalRepository(providerConfig, config.projectDir, config.cacheDir));
         break;
       case "url":
         service.addProvider(providerConfig.id, new UrlRepository(providerConfig));
