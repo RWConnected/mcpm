@@ -1,0 +1,23 @@
+FROM oven/bun:1-alpine AS builder
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY packages/core/package.json packages/core/package.json
+COPY packages/cli/package.json packages/cli/package.json
+
+RUN bun install --frozen-lockfile
+
+COPY tsconfig.base.json ./
+COPY packages/core packages/core
+COPY packages/cli packages/cli
+
+RUN bun build --compile --minify packages/cli/src/index.ts --outfile /usr/local/bin/mcpm
+
+FROM alpine:3.22 AS release
+
+RUN apk add --no-cache ca-certificates libstdc++ libgcc
+
+COPY --from=builder /usr/local/bin/mcpm /usr/local/bin/mcpm
+
+WORKDIR /data
+ENTRYPOINT ["mcpm"]

@@ -21,7 +21,7 @@ import {registerCommands} from "./commands/index.js";
 
 const program = new Command()
   .name("mcpm")
-  .version("1.0.7")
+  .version("2.0.0-beta1")
   .description("Minecraft Package Manager for mods, resources and more.")
   .option("-v, --verbose", "Enable verbose output")
   .option("-q, --quiet", "Suppress all non-error output")

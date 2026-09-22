@@ -1,6 +1,6 @@
 {
   "name": "@mcpm/cli",
-  "version": "1.0.7",
+  "version": "2.0.0-beta1",
   "type": "module",
   "bin": {
     "mcpm": "./src/index.ts"
