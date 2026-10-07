@@ -1,9 +1,21 @@
-import {afterEach, describe, expect, it} from "bun:test";
-import {createHash} from "crypto";
-import {VanillaTweaksRepository} from "./vanillatweaks-repository.js";
+import {afterEach, beforeEach, describe, expect, it} from "bun:test";
+import JSZip from "jszip";
+import {vanillaTweaksContentHash, VanillaTweaksRepository} from "./vanillatweaks-repository.js";
+
+async function buildZip(files: Record<string, string>, date: Date): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+  zip.file("data/", null, { dir: true, date });
+  for (const [name, content] of Object.entries(files)) zip.file(name, content, { date });
+  return zip.generateAsync({ type: "arraybuffer" });
+}
 
 describe("VanillaTweaksRepository", () => {
   const originalFetch = globalThis.fetch;
+  let zipBuffer: ArrayBuffer;
+
+  beforeEach(async () => {
+    zipBuffer = await buildZip({ "pack.mcmeta": "{}" }, new Date("2024-01-01T00:00:00Z"));
+  });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -30,14 +42,13 @@ describe("VanillaTweaksRepository", () => {
   });
 
   it("POSTs the datapacks selection form-urlencoded as version+packs, then downloads and hashes the zip", async () => {
-    const zipBytes = "zip-bytes";
     const calls: { url: string; init?: RequestInit }[] = [];
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
       if (url.includes("zipdatapacks.php")) {
         return { ok: true, json: async () => ({ status: "success", link: "/download/abc.zip" }) } as Response;
       }
-      return { ok: true, arrayBuffer: async () => new TextEncoder().encode(zipBytes).buffer } as Response;
+      return { ok: true, arrayBuffer: async () => zipBuffer } as Response;
     }) as unknown as typeof fetch;
 
     const repo = new VanillaTweaksRepository({
@@ -57,7 +68,7 @@ describe("VanillaTweaksRepository", () => {
 
     expect(versions).toHaveLength(1);
     expect(versions[0]?.version).toBe("1.21");
-    expect(versions[0]?.hash).toBe(createHash("sha512").update(zipBytes).digest("hex"));
+    expect(versions[0]?.hash).toBe(await vanillaTweaksContentHash(new Uint8Array(zipBuffer)));
     expect(versions[0]?.url).toBe("https://vanillatweaks.net/download/abc.zip");
   });
 
@@ -68,7 +79,7 @@ describe("VanillaTweaksRepository", () => {
       if (url.includes("zipcraftingtweaks.php")) {
         return { ok: true, json: async () => ({ status: "success", link: "/download/xyz.zip" }) } as Response;
       }
-      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+      return { ok: true, arrayBuffer: async () => zipBuffer } as Response;
     }) as unknown as typeof fetch;
 
     const repo = new VanillaTweaksRepository({
@@ -101,7 +112,7 @@ describe("VanillaTweaksRepository", () => {
       if (url.includes("zipresourcepacks.php")) {
         return { ok: true, json: async () => ({ status: "success", link: "/download/rp.zip" }) } as Response;
       }
-      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+      return { ok: true, arrayBuffer: async () => zipBuffer } as Response;
     }) as unknown as typeof fetch;
 
     const repo = new VanillaTweaksRepository({
@@ -135,7 +146,7 @@ describe("VanillaTweaksRepository", () => {
       if (url.includes("zipdatapacks.php")) {
         return { ok: true, json: async () => ({ status: "success", link: "/download/dp.zip" }) } as Response;
       }
-      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+      return { ok: true, arrayBuffer: async () => zipBuffer } as Response;
     }) as unknown as typeof fetch;
 
     const repo = new VanillaTweaksRepository({
@@ -161,5 +172,56 @@ describe("VanillaTweaksRepository", () => {
     });
     const versions = await repo.getVersions("core", ["1.21"], [], "1.21");
     expect(versions).toEqual([]);
+  });
+
+  it("content hash ignores zip timestamps (craftingtweaks zips are rebuilt per request)", async () => {
+    const files = { "pack.mcmeta": "{}", "Selected Packs.txt": "dropper to dispenser" };
+    const a = await buildZip(files, new Date("2024-01-01T00:00:00Z"));
+    const b = await buildZip(files, new Date("2026-10-07T18:07:00Z"));
+    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(false);
+    expect(await vanillaTweaksContentHash(new Uint8Array(a))).toBe(await vanillaTweaksContentHash(new Uint8Array(b)));
+  });
+
+  it("content hash changes when file contents change", async () => {
+    const date = new Date("2024-01-01T00:00:00Z");
+    const a = await buildZip({ "pack.mcmeta": "{}" }, date);
+    const b = await buildZip({ "pack.mcmeta": "{ }" }, date);
+    expect(await vanillaTweaksContentHash(new Uint8Array(a))).not.toBe(await vanillaTweaksContentHash(new Uint8Array(b)));
+  });
+
+  it("resolveDownloadUrl requests a freshly built zip instead of reusing the locked link", async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return { ok: true, json: async () => ({ status: "success", link: "/download/fresh.zip" }) } as Response;
+    }) as unknown as typeof fetch;
+
+    const repo = new VanillaTweaksRepository({
+      id: "vt1",
+      type: "vanillatweaks",
+      craftingtweaks: { tools: { hermitcraft: ["silence hoppers"] } },
+    });
+
+    const url = await repo.resolveDownloadUrl(
+      { id: "tools", version: "26.3", minecraft_versions: ["26.3"], url: "https://vanillatweaks.net/download/stale.zip", hash: "h" },
+      ["datapack"],
+    );
+
+    expect(url).toBe("https://vanillatweaks.net/download/fresh.zip");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("https://vanillatweaks.net/assets/server/zipcraftingtweaks.php");
+    expect(new URLSearchParams(calls[0]?.init?.body as string).get("version")).toBe("26.3");
+  });
+
+  it("resolveDownloadUrl throws when the zip-builder fails", async () => {
+    globalThis.fetch = (async () => ({ ok: true, json: async () => ({ status: "error" }) }) as Response) as unknown as typeof fetch;
+    const repo = new VanillaTweaksRepository({
+      id: "vt1",
+      type: "vanillatweaks",
+      datapacks: { core: { qol: ["armor statues"] } },
+    });
+    await expect(
+      repo.resolveDownloadUrl({ id: "core", version: "26.3", minecraft_versions: [], url: "", hash: "" }, ["datapack"]),
+    ).rejects.toThrow("failed to build");
   });
 });

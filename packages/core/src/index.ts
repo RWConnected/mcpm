@@ -73,3 +73,5 @@ export { Search } from "./operations/search.js";
 // Helpers
 export { resolveVersion, satisfies, compareVersions } from "./helpers/semver.js";
 export { asStr } from "./helpers/utils.js";
+export { sha512Hex, type HashFn } from "./helpers/hash.js";
+export { unbundlePacks, type BundledPack } from "./helpers/pack-bundle.js";

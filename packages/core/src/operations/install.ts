@@ -1,11 +1,12 @@
 // Install operation ported from src-tauri/src/app/modules/core/install.rs
 
-import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync} from "fs";
+import {copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync} from "fs";
 import {join} from "path";
-import {createHash} from "crypto";
 import type {ModManager} from "./mod-manager.js";
-import {modEntryToKey, type ResourceKind} from "../models/manifest.js";
-import {lockResourceMap} from "../models/lockfile.js";
+import {loadersForKind, modEntryToKey, type ResourceKind} from "../models/manifest.js";
+import {type LockEntry, lockResourceMap} from "../models/lockfile.js";
+import type {HashFn} from "../helpers/hash.js";
+import {unbundlePacks} from "../helpers/pack-bundle.js";
 
 const RESOURCE_KINDS = ["mod", "datapack", "resourcepack", "shaderpack"] as const;
 
@@ -59,20 +60,28 @@ export class Install {
     mkdirSync(cacheDir, { recursive: true });
     mkdirSync(dir, { recursive: true });
 
+    const loaders = loadersForKind(manager.manifestService.manifest, kind);
+    const providerOf = (key: string) => key.slice(0, key.indexOf(":"));
+    const hashOf = (key: string) => (bytes: Uint8Array) => manager.repoService.contentHash(providerOf(key), bytes);
+    // Cache is shared across projects and keyed by hash, so a re-resolved entry whose content
+    // changed under the same version (e.g. on-demand built zips) never collides with a stale file.
+    const cachePathFor = (key: string, entry: LockEntry) =>
+      join(cacheDir, `${key}-${entry.version}-${entry.hash.slice(0, 16)}.${extension}`);
+
     // Hash-verify existing files (unless force-rehash)
     if (!forceRehash) {
       for (const [key, entry] of lockMap) {
         if (disabledKeys.has(key)) continue;
-        const fileName = `${key}-${entry.version}.${extension}`;
-        const targetPath = join(dir, fileName);
-        const cachePath = join(cacheDir, fileName);
+        const targetPath = join(dir, `${key}-${entry.version}.${extension}`);
+        if (existsSync(targetPath) && !(await verifyFileHash(targetPath, entry.hash, hashOf(key)))) {
+          throw new Error(
+            `Hash mismatch for ${key}. Re-run with --force-rehash to continue.`,
+          );
+        }
 
-        for (const p of [targetPath, cachePath]) {
-          if (existsSync(p) && !verifyFileHash(p, entry.hash)) {
-            throw new Error(
-              `Hash mismatch for ${key}. Re-run with --force-rehash to continue.`,
-            );
-          }
+        const cachePath = cachePathFor(key, entry);
+        if (existsSync(cachePath) && !(await verifyFileHash(cachePath, entry.hash, hashOf(key)))) {
+          unlinkSync(cachePath);
         }
       }
     }
@@ -82,19 +91,33 @@ export class Install {
 
     for (const [key, entry] of lockMap) {
       if (disabledKeys.has(key)) continue;
-      const fileName = `${key}-${entry.version}.${extension}`;
-      const targetPath = join(dir, fileName);
-      const cachePath = join(cacheDir, fileName);
-      expectedFiles.push(targetPath);
+      const targetPath = join(dir, `${key}-${entry.version}.${extension}`);
+      const cachePath = cachePathFor(key, entry);
 
       const dest = noCache ? targetPath : cachePath;
       if (!existsSync(dest) || forceRehash) {
         manager.io.info(`Downloading ${key} ${entry.version}`);
-        const providerId = key.slice(0, key.indexOf(":"));
-        const headers = manager.repoService.getDownloadHeaders(providerId, entry.url);
-        await manager.downloadService.download(entry.url, dest, entry.hash, headers);
+        const providerId = providerOf(key);
+        const url = await manager.repoService.resolveDownloadUrl(providerId, entry, loaders);
+        const headers = manager.repoService.getDownloadHeaders(providerId, url);
+        await manager.downloadService.download(url, dest, entry.hash, headers, hashOf(key));
       }
 
+      // Bundles are unpacked into one file per inner pack; the bundle itself is never installed
+      // (with noCache it was downloaded to targetPath, which the cleanup below then removes).
+      const bundled = kind === "datapack" || kind === "resourcepack"
+        ? await unbundlePacks(readFileSync(dest))
+        : undefined;
+      if (bundled) {
+        for (const pack of bundled) {
+          const packPath = join(dir, `${key}-${entry.version}-${pack.name}`);
+          writeFileSync(packPath, pack.bytes);
+          expectedFiles.push(packPath);
+        }
+        continue;
+      }
+
+      expectedFiles.push(targetPath);
       if (!noCache) {
         copyFileSync(cachePath, targetPath);
       }
@@ -113,8 +136,6 @@ export class Install {
   }
 }
 
-function verifyFileHash(path: string, expected: string): boolean {
-  const bytes = readFileSync(path);
-  const actual = createHash("sha512").update(bytes).digest("hex");
-  return actual === expected;
+async function verifyFileHash(path: string, expected: string, hashFn: HashFn): Promise<boolean> {
+  return (await hashFn(readFileSync(path))) === expected;
 }

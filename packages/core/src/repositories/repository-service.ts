@@ -2,6 +2,8 @@
 
 import type {IRepository} from "./repository.interface.js";
 import type {ModResult, VersionResult} from "../models/repository.js";
+import type {LockEntry} from "../models/lockfile.js";
+import {sha512Hex} from "../helpers/hash.js";
 
 export class RepositoryService {
   private repositories = new Map<string, IRepository>();
@@ -59,5 +61,17 @@ export class RepositoryService {
   /** Auth headers (if any) a provider wants attached when downloading the given asset URL. */
   getDownloadHeaders(providerId: string, url: string): Record<string, string> | undefined {
     return this.repositories.get(providerId.toLowerCase())?.getDownloadHeaders?.(url);
+  }
+
+  /** URL to download a locked entry from; the locked url unless the provider regenerates it. */
+  async resolveDownloadUrl(providerId: string, entry: LockEntry, loaders: string[]): Promise<string> {
+    const provider = this.repositories.get(providerId.toLowerCase());
+    return provider?.resolveDownloadUrl ? provider.resolveDownloadUrl(entry, loaders) : entry.url;
+  }
+
+  /** Hash of downloaded bytes as the provider locks it; sha512 hex of the raw bytes by default. */
+  async contentHash(providerId: string, bytes: Uint8Array): Promise<string> {
+    const provider = this.repositories.get(providerId.toLowerCase());
+    return provider?.contentHash ? provider.contentHash(bytes) : sha512Hex(bytes);
   }
 }

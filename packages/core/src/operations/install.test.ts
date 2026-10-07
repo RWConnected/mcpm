@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it} from "bun:test";
-import {existsSync} from "fs";
+import {existsSync, readdirSync, readFileSync, unlinkSync} from "fs";
+import JSZip from "jszip";
 import {join} from "path";
 import {
   FakeDownloadService,
@@ -12,6 +13,7 @@ import {
 import {ModManager} from "./mod-manager.js";
 import {Install} from "./install.js";
 import {RepositoryService} from "../repositories/repository-service.js";
+import type {LockEntry} from "../models/lockfile.js";
 
 function createManager(ctx: TestContext, repo: FakeRepository, dl: FakeDownloadService): ModManager {
   const repoService = new RepositoryService();
@@ -203,5 +205,119 @@ describe("Install", () => {
     expect(existsSync(join(ctx.config.resourcepacksDir, shaderpack.filename))).toBe(false);
     expect(existsSync(join(ctx.config.shaderpacksDir, resourcepack.filename))).toBe(false);
     expect(existsSync(join(ctx.config.modsDir, resourcepack.filename))).toBe(false);
+  });
+
+  it("re-downloads when the same version was re-resolved to different content, instead of failing on a stale cache file", async () => {
+    const mcVersion = "1.21.11";
+    const before = ModFactory.create("modrinth:mod", "1.0.0");
+    const after = before.withContent(new TextEncoder().encode("rebuilt"));
+
+    const repo = new FakeRepository().withVersion(before);
+    const manager = createManager(ctx, repo, new FakeDownloadService().withMod(before));
+    LockfileFactory.create().withMod(before).writeTo(ctx.paths);
+    ManifestFactory.create(mcVersion).withMod(before).writeTo(ctx.paths);
+    await manager.load();
+    await Install.runWithManager(manager, false, false);
+
+    // Project dir file gone (e.g. fresh checkout), cache still holds the old content for this key+version.
+    unlinkSync(join(ctx.config.modsDir, before.filename));
+
+    const manager2 = createManager(ctx, new FakeRepository().withVersion(after), new FakeDownloadService().withMod(after));
+    LockfileFactory.create().withMod(after).writeTo(ctx.paths);
+    await manager2.load();
+    await Install.runWithManager(manager2, false, false);
+
+    expect(readFileSync(join(ctx.config.modsDir, after.filename), "utf-8")).toBe("rebuilt");
+  });
+
+  it("downloads from the provider-resolved URL rather than the locked one", async () => {
+    const mod = ModFactory.create("modrinth:mod", "1.0.0");
+    const freshUrl = "https://example.invalid/fresh.jar";
+
+    class RegeneratingRepository extends FakeRepository {
+      async resolveDownloadUrl(_entry: LockEntry, _loaders: string[]): Promise<string> {
+        return freshUrl;
+      }
+    }
+
+    const dl = new FakeDownloadService().withContent(freshUrl, mod.content);
+    const manager = createManager(ctx, new RegeneratingRepository().withVersion(mod), dl);
+    LockfileFactory.create().withMod(mod).writeTo(ctx.paths);
+    ManifestFactory.create("1.21.11").withMod(mod).writeTo(ctx.paths);
+    await manager.load();
+
+    await Install.runWithManager(manager, false, false);
+
+    expect(dl.downloadedUrls).toEqual([freshUrl]);
+    expect(existsSync(join(ctx.config.modsDir, mod.filename))).toBe(true);
+  });
+
+  it("verifies downloads with the provider's content hash", async () => {
+    const mod = ModFactory.create("modrinth:mod", "1.0.0");
+
+    class CustomHashRepository extends FakeRepository {
+      async contentHash(bytes: Uint8Array): Promise<string> {
+        return `len:${bytes.length}`;
+      }
+    }
+
+    const repo = new CustomHashRepository().withVersions([{ ...mod.toVersionResult(), hash: `len:${mod.content.length}` }]);
+    const manager = createManager(ctx, repo, new FakeDownloadService().withMod(mod));
+    ManifestFactory.create("1.21.11").withMod(mod).writeTo(ctx.paths);
+    await manager.load();
+
+    await Install.runWithManager(manager, false, false);
+    // Second run re-verifies the installed file with the same provider hash
+    await Install.runWithManager(manager, false, false);
+
+    expect(existsSync(join(ctx.config.modsDir, mod.filename))).toBe(true);
+  });
+
+  describe("bundled pack zips", () => {
+    async function bundleDatapack(): Promise<ModFactory> {
+      const inner = new JSZip();
+      inner.file("pack.mcmeta", "{}");
+      const innerBytes = await inner.generateAsync({ type: "uint8array" });
+      const bundle = new JSZip();
+      bundle.file("armor statues.zip", innerBytes);
+      bundle.file("more mobs.zip", innerBytes);
+      return ModFactory.create("modrinth:core", "1.0.0", "datapack")
+        .withContent(await bundle.generateAsync({ type: "uint8array" }));
+    }
+
+    function setup(datapack: ModFactory): ModManager {
+      const manager = createManager(ctx, new FakeRepository().withVersion(datapack), new FakeDownloadService().withMod(datapack));
+      LockfileFactory.create().withDatapack(datapack).writeTo(ctx.paths);
+      ManifestFactory.create("1.21.11").withDatapack(datapack).writeTo(ctx.paths);
+      return manager;
+    }
+
+    for (const noCache of [false, true]) {
+      it(`unpacks a zip of datapack zips into the datapacks dir (noCache=${noCache})`, async () => {
+        const manager = setup(await bundleDatapack());
+        await manager.load();
+
+        await Install.runWithManager(manager, noCache, false);
+        // A second run must not trip over the missing bundle file
+        await Install.runWithManager(manager, noCache, false);
+
+        expect(readdirSync(ctx.config.datapacksDir).sort()).toEqual([
+          "modrinth:core-1.0.0-armor statues.zip",
+          "modrinth:core-1.0.0-more mobs.zip",
+        ]);
+      });
+    }
+
+    it("removes unpacked files when the bundle is removed from the manifest", async () => {
+      const manager = setup(await bundleDatapack());
+      await manager.load();
+      await Install.runWithManager(manager, false, false);
+
+      ManifestFactory.create("1.21.11").writeTo(ctx.paths);
+      await manager.load();
+      await Install.runWithManager(manager, false, false);
+
+      expect(readdirSync(ctx.config.datapacksDir)).toEqual([]);
+    });
   });
 });

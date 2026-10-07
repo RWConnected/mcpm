@@ -1,4 +1,5 @@
 import {describe, expect, it} from "bun:test";
+import {createHash} from "crypto";
 import {RepositoryService} from "./repository-service.js";
 import {FakeRepository} from "../testing/fake-repository.js";
 import {ModFactory} from "../testing/mod-factory.js";
@@ -98,6 +99,31 @@ describe("RepositoryService", () => {
     it("reports false for an unregistered provider", () => {
       const service = new RepositoryService();
       expect(service.supportsDiscovery("unknown")).toBe(false);
+    });
+  });
+
+  describe("download hooks", () => {
+    const entry = { id: "mod", version: "1.0.0", minecraft_versions: [], url: "https://example.invalid/locked.jar", hash: "h" };
+
+    it("defaults to the locked url and a raw sha512 hash", async () => {
+      const service = new RepositoryService();
+      service.addProvider("modrinth", new FakeRepository());
+      const bytes = new TextEncoder().encode("x");
+
+      expect(await service.resolveDownloadUrl("modrinth", entry, [])).toBe(entry.url);
+      expect(await service.contentHash("modrinth", bytes)).toBe(createHash("sha512").update(bytes).digest("hex"));
+    });
+
+    it("delegates to the provider when it implements the hooks", async () => {
+      class Custom extends FakeRepository {
+        async resolveDownloadUrl(): Promise<string> { return "https://example.invalid/fresh.jar"; }
+        async contentHash(): Promise<string> { return "custom"; }
+      }
+      const service = new RepositoryService();
+      service.addProvider("vt", new Custom());
+
+      expect(await service.resolveDownloadUrl("VT", entry, [])).toBe("https://example.invalid/fresh.jar");
+      expect(await service.contentHash("vt", new Uint8Array())).toBe("custom");
     });
   });
 });

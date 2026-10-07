@@ -11,7 +11,7 @@ export function registerInstall(program: Command, getManager: () => Promise<ModM
       const manager = await getManager();
       const io = manager.io;
       try {
-        await Install.runWithManager(manager, opts.noCache === true, opts.forceRehash === true);
+        await Install.runWithManager(manager, opts.cache === false, opts.forceRehash === true);
         io.success("Installation completed successfully");
       } catch (e) {
         io.error(e instanceof Error ? e.message : String(e));
